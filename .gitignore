@@ -1,0 +1,38 @@
+# Conda环境
+env/
+venv/
+*.env
+.env/
+
+# 数据文件
+data/
+*.data
+*.dat
+*.h5
+*.npy
+*.npz
+
+# 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 日志和系统文件
+*.log
+*.sqlite
+
+# IDE相关
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 大型模型文件
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# 其他
+.DS_Store
+*.ipynb_checkpoints
