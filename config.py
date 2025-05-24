@@ -1,5 +1,7 @@
 import pyautogui
+import mediapipe as mp
 
+mp_hands = mp.solutions.hands
 # Screen Dimensions (initialize once)
 SCREEN_W, SCREEN_H = pyautogui.size()
 

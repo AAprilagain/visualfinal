@@ -13,7 +13,7 @@ SUPPORTED_PROFILES = {
 _profile_keys = list(SUPPORTED_PROFILES.keys())
 _current_profile_index = 0
 
-def get_active_application_profile():
+def get_active_application_profile(_current_app__profile_name= "default"):
     """
     Returns the name of the current application profile.
     In a real scenario, this would detect the active window's application
