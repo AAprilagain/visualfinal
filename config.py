@@ -23,8 +23,8 @@ SCROLL_MOVEMENT_THRESHOLD_Y = 0.010  # Min normalized vertical wrist movement fo
 SCROLL_SENSITIVITY_FACTOR = 150     # Multiplier for scroll amount
 
 # Swipe Gesture Parameters
-SWIPE_THRESHOLD_SPEED = 0.2  # Normalized units/second for swipe
-SWIPE_ACTION_DELAY = 0.5     # Seconds to wait after a swipe action
+SWIPE_THRESHOLD_SPEED = 0.1  # Normalized units/second for swipe
+SWIPE_ACTION_DELAY = 1     # Seconds to wait after a swipe action
 
 # Mouse Movement Mapping
 MOUSE_MAP_X_MIN = 0.2  # Normalized hand x-coordinate to map to screen left

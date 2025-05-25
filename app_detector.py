@@ -1,37 +1,64 @@
 # Placeholder for active application detection
 # For a real implementation, you would use OS-specific libraries
 # like pywin32 (Windows), AppKit (macOS), or python-xlib (Linux).
+# Using pygetwindow for a cross-platform attempt.
+import pygetwindow as gw
 
 _current_app_profile_name = "default" # Default profile
 
 SUPPORTED_PROFILES = {
     "default": "Default Profile",
     "browser": "Web Browser Profile",
-    "designer": "Design Tool Profile"
-    # Add more profiles as needed
+    "douyin": "Douyin/TikTok Profile" # Added Douyin profile
 }
 _profile_keys = list(SUPPORTED_PROFILES.keys())
-_current_profile_index = 0
+_current_profile_index = 0 # Ensure this starts at 'default' if 'default' is the first key
 
-def get_active_application_profile(_current_app__profile_name= "default"):
+# Initialize _current_app_profile_name to the first key in _profile_keys
+if _profile_keys:
+    _current_app_profile_name = _profile_keys[0]
+    _current_profile_index = 0
+
+
+def get_active_application_profile():
     """
     Returns the name of the current application profile.
-    In a real scenario, this would detect the active window's application
-    and return a corresponding profile name (e.g., "chrome", "photoshop", "default").
+    Attempts to detect the active window's application.
     """
-    global _current_app_profile_name
-    return _current_app__profile_name
+    global _current_app_profile_name # Ensure we are modifying the global variable
+
+    if gw:
+        try:
+            active_window = gw.getActiveWindow()
+            if active_window:
+                window_title = active_window.title.lower()
+                # print(f"Active window: {window_title}") # For debugging
+                if "抖音" in window_title or "tiktok" in window_title:
+                    return "douyin"
+                elif "chrome" in window_title or "firefox" in window_title or "edge" in window_title or "safari" in window_title:
+                    return "browser"
+                # Add other application detection logic here
+        except Exception as e:
+            # print(f"Error detecting active window: {e}") # Might be too noisy
+            # Fallback to the manually cycled profile if detection fails
+            return _current_app_profile_name
+    # Fallback to the manually cycled profile if pygetwindow is not available or fails
+    return _current_app_profile_name
 
 def cycle_app_profile():
     """
     Cycles through available application profiles.
-    This is a manual override for demonstration.
+    This is a manual override.
     """
     global _current_app_profile_name, _current_profile_index
     _current_profile_index = (_current_profile_index + 1) % len(_profile_keys)
     _current_app_profile_name = _profile_keys[_current_profile_index]
-    print(f"Switched to profile: {SUPPORTED_PROFILES[_current_app_profile_name]}")
+    print(f"Manually switched to profile: {SUPPORTED_PROFILES[_current_app_profile_name]}")
     return _current_app_profile_name
 
 def get_current_profile_display_name():
-    return SUPPORTED_PROFILES.get(get_active_application_profile(), "Unknown Profile")
+    # Use the result of the detection, not the manually cycled one directly,
+    # unless manual cycling is the only source of truth.
+    # For this setup, get_active_application_profile now incorporates detection.
+    detected_profile = get_active_application_profile()
+    return SUPPORTED_PROFILES.get(detected_profile, "Unknown Profile")

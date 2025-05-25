@@ -1,13 +1,9 @@
-# action_controller.py
-
 import pyautogui
 import time
 import config
 import app_detector # To get the current application profile
 
 # --- Define Base Actions ---
-# These are lambda functions that will be called by pyautogui
-# They can take arguments like coordinates or scroll amount.
 BASE_ACTIONS = {
     "do_nothing": lambda **kwargs: None,
     "mouse_move": lambda x, y, **kwargs: pyautogui.moveTo(x, y, duration=config.PYAUTOGUI_MOVE_DURATION_MOUSE),
@@ -23,28 +19,31 @@ BASE_ACTIONS = {
     "hotkey_down": lambda **kwargs: pyautogui.hotkey('down'),
     "hotkey_alt_left": lambda **kwargs: pyautogui.hotkey('alt', 'left'), # Example for browser back
     "hotkey_alt_right": lambda **kwargs: pyautogui.hotkey('alt', 'right'),# Example for browser forward
+    "hotkey_ctrl_z": lambda **kwargs: pyautogui.hotkey('ctrl', 'z'),
+    "hotkey_ctrl_shift_z": lambda **kwargs: pyautogui.hotkey('ctrl', 'shift', 'z'),
+    # New keyboard actions
+    "press_x": lambda **kwargs: pyautogui.press('x'),
+    "press_z": lambda **kwargs: pyautogui.press('z'),
+    "press_space": lambda **kwargs: pyautogui.press('space'),
 }
 
 # --- Define Gesture Mappings for Different Application Profiles ---
-# Each profile maps a GESTURE_NAME from config.py to an ACTION_KEY from BASE_ACTIONS.
 APP_GESTURE_MAPPINGS = {
     "default": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
-        config.GESTURE_LEFT_CLICK: "left_click",
+        config.GESTURE_LEFT_CLICK: "left_click", #
         config.GESTURE_DOUBLE_CLICK: "double_click",
         config.GESTURE_DRAG_START: "mouse_down_left",
-        config.GESTURE_DRAGGING: "mouse_drag", # Data (x,y) will be passed
+        config.GESTURE_DRAGGING: "mouse_drag",
         config.GESTURE_DRAG_DROP: "mouse_up_left",
-        config.GESTURE_SCROLL_UP: "scroll",    # Data (amount) will be passed
-        config.GESTURE_SCROLL_DOWN: "scroll",  # Data (amount, will be negative)
-        config.GESTURE_SWIPE_LEFT: "hotkey_left",
-        config.GESTURE_SWIPE_RIGHT: "hotkey_right",
-        config.GESTURE_SWIPE_UP: "hotkey_up",
-        config.GESTURE_SWIPE_DOWN: "hotkey_down",
-        # config.GESTURE_NONE: "do_nothing", # Optional
-        # config.GESTURE_SCROLL_MODE_ENGAGED: "do_nothing", # Usually just for display
+        config.GESTURE_SCROLL_UP: "scroll",
+        config.GESTURE_SCROLL_DOWN: "scroll",
+        config.GESTURE_SWIPE_LEFT: "hotkey_left", #
+        config.GESTURE_SWIPE_RIGHT: "hotkey_right", #
+        config.GESTURE_SWIPE_UP: "hotkey_up", #
+        config.GESTURE_SWIPE_DOWN: "hotkey_down", #
     },
-    "browser": { # Example: Web Browser
+    "browser": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
         config.GESTURE_LEFT_CLICK: "left_click",
         config.GESTURE_DOUBLE_CLICK: "double_click",
@@ -53,40 +52,38 @@ APP_GESTURE_MAPPINGS = {
         config.GESTURE_DRAG_DROP: "mouse_up_left",
         config.GESTURE_SCROLL_UP: "scroll",
         config.GESTURE_SCROLL_DOWN: "scroll",
-        config.GESTURE_SWIPE_LEFT: "hotkey_alt_left",  # Browser Back
-        config.GESTURE_SWIPE_RIGHT: "hotkey_alt_right", # Browser Forward
-        config.GESTURE_SWIPE_UP: "hotkey_up",       # Page Up (or custom)
-        config.GESTURE_SWIPE_DOWN: "hotkey_down",   # Page Down (or custom)
+        config.GESTURE_SWIPE_LEFT: "hotkey_alt_left",
+        config.GESTURE_SWIPE_RIGHT: "hotkey_alt_right",
+        config.GESTURE_SWIPE_UP: "hotkey_up",
+        config.GESTURE_SWIPE_DOWN: "hotkey_down",
     },
-    "designer": { # Example: Design Tool (e.g., Photoshop, Illustrator)
+    "douyin": { # New Profile for Douyin/TikTok
         config.GESTURE_MOUSE_MOVING: "mouse_move",
-        config.GESTURE_LEFT_CLICK: "left_click",
-        config.GESTURE_DOUBLE_CLICK: "double_click", # May not be used often
-        config.GESTURE_DRAG_START: "mouse_down_left",
-        config.GESTURE_DRAGGING: "mouse_drag",
-        config.GESTURE_DRAG_DROP: "mouse_up_left",
-        config.GESTURE_SCROLL_UP: "scroll", # Zoom in (often Ctrl+Scroll or Alt+Scroll)
-        config.GESTURE_SCROLL_DOWN: "scroll",# Zoom out
-        # Potentially map swipes to tool changes or undo/redo
-        config.GESTURE_SWIPE_LEFT: "hotkey_ctrl_z", # Example: Undo (Ctrl+Z)
-        config.GESTURE_SWIPE_RIGHT: "hotkey_ctrl_shift_z", # Example: Redo (Ctrl+Shift+Z)
-        # You would add more custom BASE_ACTIONS for complex hotkeys
+        config.GESTURE_LEFT_CLICK: "do_nothing",       # Left click disabled
+        config.GESTURE_DOUBLE_CLICK: "double_click",     # Optionally disable double click too or map to other action
+        config.GESTURE_DRAG_START: "do_nothing",       # Disable dragging by default or map if needed
+        config.GESTURE_DRAGGING: "do_nothing",
+        config.GESTURE_DRAG_DROP: "do_nothing",
+        config.GESTURE_SCROLL_UP: "press_space",            # Keep scroll for feed navigation
+        config.GESTURE_SCROLL_DOWN: "press_x",
+        config.GESTURE_SWIPE_LEFT: "do_nothing",          # Swipe Left maps to 'x' key
+        config.GESTURE_SWIPE_RIGHT: "do_nothing",         # Swipe Right maps to 'z' key
+        config.GESTURE_SWIPE_UP: "hotkey_up",        # Swipe Up maps to 'space' key (e.g., for 'like' or 'play/pause')
+        config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down could be page down or another action
+        # Map other gestures as needed, or they will default to "do_nothing" if not in BASE_ACTIONS
     }
 }
-# Add more complex hotkeys to BASE_ACTIONS if needed:
-BASE_ACTIONS["hotkey_ctrl_z"] = lambda **kwargs: pyautogui.hotkey('ctrl', 'z')
-BASE_ACTIONS["hotkey_ctrl_shift_z"] = lambda **kwargs: pyautogui.hotkey('ctrl', 'shift', 'z')
 
 
 class ActionController:
     def __init__(self):
-        pyautogui.FAILSAFE = config.PYAUTOGUI_FAILSAFE
-        self.active_profile_name = app_detector.get_active_application_profile()
+        pyautogui.FAILSAFE = config.PYAUTOGUI_FAILSAFE #
+        self.active_profile_name = app_detector.get_active_application_profile() #
         self.current_gesture_map = APP_GESTURE_MAPPINGS.get(self.active_profile_name, APP_GESTURE_MAPPINGS["default"])
         print(f"ActionController initialized with profile: {self.active_profile_name}")
 
     def update_profile(self):
-        new_profile_name = app_detector.get_active_application_profile()
+        new_profile_name = app_detector.get_active_application_profile() #
         if new_profile_name != self.active_profile_name:
             self.active_profile_name = new_profile_name
             self.current_gesture_map = APP_GESTURE_MAPPINGS.get(self.active_profile_name, APP_GESTURE_MAPPINGS["default"])
@@ -98,8 +95,7 @@ class ActionController:
         Executes a pyautogui action based on the recognized gesture and current app profile.
         Args:
             gesture_name (str): The name of the gesture from config.py (e.g., config.GESTURE_LEFT_CLICK).
-            gesture_data (dict, optional): Data associated with the gesture (e.g., {'x':100, 'y':100} for move,
-                                           {'amount': 5} for scroll).
+            gesture_data (dict, optional): Data associated with the gesture.
         """
         if gesture_data is None:
             gesture_data = {}
@@ -111,17 +107,18 @@ class ActionController:
         if action_key and action_key in BASE_ACTIONS:
             action_function = BASE_ACTIONS[action_key]
             try:
-                # Pass relevant data to the action function
-                # The lambda functions in BASE_ACTIONS use **kwargs to accept these
                 action_function(**gesture_data)
-
-                # Special handling for swipe delays
-                if gesture_name in [config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT,
-                                    config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN]:
-                    time.sleep(config.SWIPE_ACTION_DELAY)
-
+                if gesture_name in [config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT, #
+                                    config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN]: #
+                    time.sleep(config.SWIPE_ACTION_DELAY) #
             except Exception as e:
                 print(f"Error executing action '{action_key}' for gesture '{gesture_name}': {e}")
-        # else:
-            # No action mapped for this gesture in the current profile, or action key is invalid
-            # print(f"No action mapped for gesture '{gesture_name}' in profile '{self.active_profile_name}'")
+        # else: # This part can be un-commented for debugging missing mappings
+            # action_in_default = APP_GESTURE_MAPPINGS["default"].get(gesture_name)
+            # if action_in_default and action_in_default in BASE_ACTIONS and self.active_profile_name != "default":
+            #     # Fallback to default profile's action if not specifically mapped in current profile
+            #     # and the action is not "do_nothing" (or handle "do_nothing" explicitly if needed)
+            #     # print(f"Gesture '{gesture_name}' not in profile '{self.active_profile_name}', trying default.")
+            #     # BASE_ACTIONS[action_in_default](**gesture_data)
+            # else:
+            #     print(f"No action mapped for gesture '{gesture_name}' in profile '{self.active_profile_name}' or default.")
