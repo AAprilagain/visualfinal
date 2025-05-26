@@ -184,7 +184,7 @@ class GestureRecognizer:
                 elif getattr(self, 'swipe_locked', False) and current_time - self.lock_timer > 0.6:
                     self.swipe_locked = False
 
-        #
+
         self.was_pinching_last_frame = current_pinch_is_physically_active
         # Store the entire NormalizedLandmarkList object for the next frame
         self.prev_landmarks = hand_landmark_obj
