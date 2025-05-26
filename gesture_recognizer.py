@@ -18,6 +18,7 @@ class GestureRecognizer:
         # self.prev_landmarks will store the entire NormalizedLandmarkList object from the previous frame
         self.prev_landmarks = None
         self.last_gesture_time = 0 # To prevent rapid firing of some gestures like swipe
+        self.last_frame_time = 0
 
     def _reset_pinch_states(self):
         self.was_pinching_last_frame = False
@@ -63,6 +64,10 @@ class GestureRecognizer:
         pinch_just_started = current_pinch_is_physically_active and not self.was_pinching_last_frame
         pinch_just_released = not current_pinch_is_physically_active and self.was_pinching_last_frame
 
+        # 更新 frame_interval 使用真实时间差
+        frame_interval = current_time - self.last_frame_time
+        self.last_frame_time = current_time
+
         # --- 2. Pinch-related Actions (Click, Double Click, Drag) ---
         if pinch_just_started:
             self.pinch_start_time = current_time
@@ -80,23 +85,23 @@ class GestureRecognizer:
         elif current_pinch_is_physically_active:
             pinch_current_mid_x_norm, pinch_current_mid_y_norm = utils.get_pinch_midpoint_normalized(thumb_tip, index_tip)
             current_pinch_screen_pos = utils.map_to_screen(pinch_current_mid_x_norm, pinch_current_mid_y_norm)
-
+#
             if not self.is_dragging_state:
                 pinch_duration = current_time - self.pinch_start_time
                 movement_since_pinch_start = utils.calculate_distance_2d(self.pinch_start_screen_pos, current_pinch_screen_pos)
-
+#
                 if pinch_duration > config.DRAG_CONFIRM_DURATION and \
                    movement_since_pinch_start > config.DRAG_CONFIRM_MOVEMENT:
                     self.is_dragging_state = True
                     self.pending_single_click = False
                     recognized_gesture = config.GESTURE_DRAG_START
                     gesture_data = {'x': current_pinch_screen_pos[0], 'y': current_pinch_screen_pos[1]}
-
+#
             if self.is_dragging_state: # This condition should likely be part of the above if, or ensure it's mutually exclusive
                 recognized_gesture = config.GESTURE_DRAGGING
                 gesture_data = {'x': current_pinch_screen_pos[0], 'y': current_pinch_screen_pos[1]}
             action_performed_this_frame = True # This should be set if any action in this block is taken
-
+#
         elif pinch_just_released:
             if self.is_dragging_state:
                 recognized_gesture = config.GESTURE_DRAG_DROP
@@ -106,27 +111,27 @@ class GestureRecognizer:
                 self.last_click_action_time = current_time
             self.pending_single_click = False
             action_performed_this_frame = True
-
-        # --- 3. Other Gestures (if no pinch action was definitive) ---
+#
+        ## --- 3. Other Gestures (if no pinch action was definitive) ---
         if not action_performed_this_frame:
             # Pass the list of landmark points (actual_landmarks) to utility functions
             finger_ext_states = utils.get_finger_extended_states(actual_landmarks)
             thumb_ext_state = utils.is_thumb_extended(actual_landmarks)
-
+#
             if finger_ext_states[0] and not any(finger_ext_states[1:]) and \
                not current_pinch_is_physically_active and not self.is_dragging_state:
                 target_x, target_y = utils.map_to_screen(index_tip.x, index_tip.y)
                 recognized_gesture = config.GESTURE_MOUSE_MOVING
                 gesture_data = {'x': target_x, 'y': target_y}
                 action_performed_this_frame = True
-
+#
             elif thumb_ext_state and not any(finger_ext_states):
                 recognized_gesture = config.GESTURE_SCROLL_MODE_ENGAGED
                 if self.prev_landmarks: # self.prev_landmarks is the NormalizedLandmarkList object
                     curr_wrist_y = wrist.y # wrist is actual_landmarks[config.mp_hands.HandLandmark.WRIST]
                     prev_wrist_y = self.prev_landmarks.landmark[config.mp_hands.HandLandmark.WRIST].y # Access .landmark here
                     dy_wrist = curr_wrist_y - prev_wrist_y
-
+#
                     if abs(dy_wrist) > config.SCROLL_MOVEMENT_THRESHOLD_Y:
                         scroll_amount = int(-1 * dy_wrist * config.SCROLL_SENSITIVITY_FACTOR)
                         if scroll_amount > 0:
@@ -135,32 +140,51 @@ class GestureRecognizer:
                             recognized_gesture = config.GESTURE_SCROLL_DOWN
                         gesture_data = {'amount': scroll_amount}
                         action_performed_this_frame = True
-
+#
             elif self.prev_landmarks and (current_time - self.last_gesture_time > config.SWIPE_ACTION_DELAY):
-                # self.prev_landmarks is the NormalizedLandmarkList object
-                prev_wrist_lm = self.prev_landmarks.landmark[config.mp_hands.HandLandmark.WRIST] # Access .landmark
+
+                # === 新增变量 ===
+                # self.last_frame_time: 上一帧的时间戳（用于计算真实帧间隔）
+                # self.swipe_locked: 是否处于滑动动作的锁定期，防止多次识别
+                # self.lock_timer: 锁定期起始时间戳
+
+                # 初始化建议：
+                # self.last_frame_time = time.time()
+                # self.swipe_locked = False
+                # self.lock_timer = 0.0
+
+                frame_interval = current_time - self.last_frame_time if self.last_frame_time else 1 / 30.0
+                self.last_frame_time = current_time
+
+                prev_wrist_lm = self.prev_landmarks.landmark[config.mp_hands.HandLandmark.WRIST]
                 palm_center_x_prev = prev_wrist_lm.x
                 palm_center_y_prev = prev_wrist_lm.y
-                palm_center_x_curr = wrist.x # wrist is actual_landmarks[config.mp_hands.HandLandmark.WRIST]
+                palm_center_x_curr = wrist.x
                 palm_center_y_curr = wrist.y
 
                 dx = palm_center_x_curr - palm_center_x_prev
                 dy = palm_center_y_curr - palm_center_y_prev
-                frame_interval = 1 / config.ASSUMED_FPS
 
                 speed_x = abs(dx) / frame_interval if frame_interval > 0 else 0
                 speed_y = abs(dy) / frame_interval if frame_interval > 0 else 0
 
-                if speed_x > config.SWIPE_THRESHOLD_SPEED or speed_y > config.SWIPE_THRESHOLD_SPEED:
-                    if speed_x > speed_y:
-                        if dx > 0: recognized_gesture = config.GESTURE_SWIPE_RIGHT
-                        else: recognized_gesture = config.GESTURE_SWIPE_LEFT
-                    else:
-                        if dy > 0: recognized_gesture = config.GESTURE_SWIPE_DOWN
-                        else: recognized_gesture = config.GESTURE_SWIPE_UP
-                    action_performed_this_frame = True
-                    self.last_gesture_time = current_time
+                if not getattr(self, 'swipe_locked', False) and \
+                        (speed_x > config.SWIPE_THRESHOLD_SPEED or speed_y > config.SWIPE_THRESHOLD_SPEED):
 
+                    if speed_x > speed_y:
+                        recognized_gesture = config.GESTURE_SWIPE_RIGHT if dx > 0 else config.GESTURE_SWIPE_LEFT
+                    else:
+                        recognized_gesture = config.GESTURE_SWIPE_DOWN if dy > 0 else config.GESTURE_SWIPE_UP
+
+                    self.swipe_locked = True
+                    self.lock_timer = current_time
+                    self.last_gesture_time = current_time
+                    action_performed_this_frame = True
+
+                elif getattr(self, 'swipe_locked', False) and current_time - self.lock_timer > 0.6:
+                    self.swipe_locked = False
+
+        #
         self.was_pinching_last_frame = current_pinch_is_physically_active
         # Store the entire NormalizedLandmarkList object for the next frame
         self.prev_landmarks = hand_landmark_obj
