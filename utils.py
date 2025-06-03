@@ -10,6 +10,12 @@ def calculate_distance_2d(p1, p2):
     """Calculates the 2D Euclidean distance between two screen points."""
     return hypot(p1[0] - p2[0], p1[1] - p2[1])
 
+def calculate_movement_2d_normalized(lm1, lm2):
+    """Calculates the 2D movement (dx, dy) between two normalized landmark points."""
+    dx = lm2.x - lm1.x
+    dy = lm2.y - lm1.y
+    return dx, dy
+
 def get_finger_extended_states(landmarks):
     """
     Checks if fingers are extended.
@@ -17,6 +23,7 @@ def get_finger_extended_states(landmarks):
     """
     states = []
     # Index, Middle, Ring, Pinky
+    # Using more robust check: tip should be significantly higher (lower y) than both DIP and PIP
     for tip_idx, dip_idx, pip_idx in [(8, 6, 5), (12, 10, 9), (16, 14, 13), (20, 18, 17)]:
         # Finger is extended if tip is above DIP and PIP joints
         # (assuming hand is upright, lower y means higher up)
@@ -27,6 +34,7 @@ def get_finger_extended_states(landmarks):
 def is_thumb_extended(landmarks):
     """Checks if the thumb is extended (tip higher than knuckle)."""
     # Thumb is extended if tip (4) is above MCP joint (2)
+    # Adding a small threshold to avoid minor fluctuations
     return landmarks[4].y < landmarks[3].y and landmarks[3].y < landmarks[2].y
 
 

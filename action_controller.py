@@ -31,17 +31,17 @@ BASE_ACTIONS = {
 APP_GESTURE_MAPPINGS = {
     "default": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
-        config.GESTURE_LEFT_CLICK: "left_click", #
+        config.GESTURE_LEFT_CLICK: "left_click",
         config.GESTURE_DOUBLE_CLICK: "double_click",
         config.GESTURE_DRAG_START: "mouse_down_left",
         config.GESTURE_DRAGGING: "mouse_drag",
         config.GESTURE_DRAG_DROP: "mouse_up_left",
         config.GESTURE_SCROLL_UP: "scroll",
         config.GESTURE_SCROLL_DOWN: "scroll",
-        config.GESTURE_SWIPE_LEFT: "hotkey_left", #
-        config.GESTURE_SWIPE_RIGHT: "hotkey_right", #
-        config.GESTURE_SWIPE_UP: "hotkey_up", #
-        config.GESTURE_SWIPE_DOWN: "hotkey_down", #
+        config.GESTURE_SWIPE_LEFT: "hotkey_left",
+        config.GESTURE_SWIPE_RIGHT: "hotkey_right",
+        config.GESTURE_SWIPE_UP: "hotkey_up",
+        config.GESTURE_SWIPE_DOWN: "hotkey_down",
     },
     "browser": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
@@ -60,16 +60,16 @@ APP_GESTURE_MAPPINGS = {
     "douyin": { # New Profile for Douyin/TikTok
         config.GESTURE_MOUSE_MOVING: "mouse_move",
         config.GESTURE_LEFT_CLICK: "do_nothing",       # Left click disabled
-        config.GESTURE_DOUBLE_CLICK: "double_click",     # Optionally disable double click too or map to other action
+        config.GESTURE_DOUBLE_CLICK: "do_nothing",     # Optionally disable double click too or map to other action
         config.GESTURE_DRAG_START: "do_nothing",       # Disable dragging by default or map if needed
         config.GESTURE_DRAGGING: "do_nothing",
         config.GESTURE_DRAG_DROP: "do_nothing",
-        config.GESTURE_SCROLL_UP: "press_space",            # Keep scroll for feed navigation
-        config.GESTURE_SCROLL_DOWN: "press_x",
-        config.GESTURE_SWIPE_LEFT: "do_nothing",          # Swipe Left maps to 'x' key
-        config.GESTURE_SWIPE_RIGHT: "do_nothing",         # Swipe Right maps to 'z' key
-        config.GESTURE_SWIPE_UP: "hotkey_up",        # Swipe Up maps to 'space' key (e.g., for 'like' or 'play/pause')
-        config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down could be page down or another action
+        config.GESTURE_SCROLL_UP: "press_space",            # Scroll up maps to 'space' (e.g., play/pause)
+        config.GESTURE_SCROLL_DOWN: "press_x",            # Scroll down maps to 'x' (e.g., next video)
+        config.GESTURE_SWIPE_LEFT: "do_nothing",          # Swipe Left disabled
+        config.GESTURE_SWIPE_RIGHT: "do_nothing",         # Swipe Right disabled
+        config.GESTURE_SWIPE_UP: "hotkey_up",        # Swipe Up (e.g., like)
+        config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down (e.g., previous video)
         # Map other gestures as needed, or they will default to "do_nothing" if not in BASE_ACTIONS
     }
 }
@@ -77,13 +77,13 @@ APP_GESTURE_MAPPINGS = {
 
 class ActionController:
     def __init__(self):
-        pyautogui.FAILSAFE = config.PYAUTOGUI_FAILSAFE #
-        self.active_profile_name = app_detector.get_active_application_profile() #
+        pyautogui.FAILSAFE = config.PYAUTOGUI_FAILSAFE
+        self.active_profile_name = app_detector.get_active_application_profile()
         self.current_gesture_map = APP_GESTURE_MAPPINGS.get(self.active_profile_name, APP_GESTURE_MAPPINGS["default"])
         print(f"ActionController initialized with profile: {self.active_profile_name}")
 
     def update_profile(self):
-        new_profile_name = app_detector.get_active_application_profile() #
+        new_profile_name = app_detector.get_active_application_profile()
         if new_profile_name != self.active_profile_name:
             self.active_profile_name = new_profile_name
             self.current_gesture_map = APP_GESTURE_MAPPINGS.get(self.active_profile_name, APP_GESTURE_MAPPINGS["default"])
@@ -108,17 +108,11 @@ class ActionController:
             action_function = BASE_ACTIONS[action_key]
             try:
                 action_function(**gesture_data)
-                if gesture_name in [config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT, #
-                                    config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN]: #
-                    time.sleep(config.SWIPE_ACTION_DELAY) #
+                # Only apply swipe action delay if an actual swipe action was performed
+                if gesture_name in [config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT,
+                                    config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN]:
+                    time.sleep(config.SWIPE_ACTION_DELAY)
             except Exception as e:
                 print(f"Error executing action '{action_key}' for gesture '{gesture_name}': {e}")
-        # else: # This part can be un-commented for debugging missing mappings
-            # action_in_default = APP_GESTURE_MAPPINGS["default"].get(gesture_name)
-            # if action_in_default and action_in_default in BASE_ACTIONS and self.active_profile_name != "default":
-            #     # Fallback to default profile's action if not specifically mapped in current profile
-            #     # and the action is not "do_nothing" (or handle "do_nothing" explicitly if needed)
-            #     # print(f"Gesture '{gesture_name}' not in profile '{self.active_profile_name}', trying default.")
-            #     # BASE_ACTIONS[action_in_default](**gesture_data)
-            # else:
-            #     print(f"No action mapped for gesture '{gesture_name}' in profile '{self.active_profile_name}' or default.")
+        # else:
+        #     print(f"No action mapped for gesture '{gesture_name}' in profile '{self.active_profile_name}' or default, or action_key not in BASE_ACTIONS.")
