@@ -4,15 +4,15 @@
 # Using pygetwindow for a cross-platform attempt.
 import pygetwindow as gw
 
-_current_app_profile_name = "default" # Default profile
+_current_app_profile_name = "default"  # Default profile
 
 SUPPORTED_PROFILES = {
     "default": "Default Profile",
     "browser": "Web Browser Profile",
-    "douyin": "Douyin/TikTok Profile" # Added Douyin profile
+    "douyin": "Douyin/TikTok Profile"  # Added Douyin profile
 }
 _profile_keys = list(SUPPORTED_PROFILES.keys())
-_current_profile_index = 0 # Ensure this starts at 'default' if 'default' is the first key
+_current_profile_index = 0  # Ensure this starts at 'default' if 'default' is the first key
 
 # Initialize _current_app_profile_name to the first key in _profile_keys
 if _profile_keys:
@@ -25,7 +25,7 @@ def get_active_application_profile():
     Returns the name of the current application profile.
     Attempts to detect the active window's application.
     """
-    global _current_app_profile_name # Ensure we are modifying the global variable
+    global _current_app_profile_name  # Ensure we are modifying the global variable
 
     if gw:
         try:
@@ -45,6 +45,7 @@ def get_active_application_profile():
     # Fallback to the manually cycled profile if pygetwindow is not available or fails
     return _current_app_profile_name
 
+
 def cycle_app_profile():
     """
     Cycles through available application profiles.
@@ -55,6 +56,7 @@ def cycle_app_profile():
     _current_app_profile_name = _profile_keys[_current_profile_index]
     print(f"Manually switched to profile: {SUPPORTED_PROFILES[_current_app_profile_name]}")
     return _current_app_profile_name
+
 
 def get_current_profile_display_name():
     # Use the result of the detection, not the manually cycled one directly,
