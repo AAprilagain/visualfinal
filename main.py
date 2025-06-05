@@ -1,12 +1,14 @@
 import cv2
 import time
-
+import ctypes
+import sys
 import config
 import utils
 from hand_tracker import HandTracker
 from gesture_recognizer import GestureRecognizer
 from action_controller import ActionController
-import app_detector # For manually cycling profiles in this example
+import app_detector  # For manually cycling profiles in this example
+
 
 def main():
     cap = cv2.VideoCapture(0)
@@ -19,19 +21,26 @@ def main():
     action_controller = ActionController()
 
     current_display_gesture = config.GESTURE_NONE
-    last_actionable_gesture = config.GESTURE_NONE # To keep displaying the last *action*
+    last_actionable_gesture = config.GESTURE_NONE  # To keep displaying the last *action*
 
     print("Gesture Control HCI Started.")
     print("Press 'q' to quit.")
     print("Press 'p' to cycle through application profiles.")
+
+    prev_time = time.time()
+
+    # cv2.namedWindow('Gesture Control HCI', cv2.WINDOW_NORMAL)
+    # cv2.resizeWindow('Gesture Control HCI', 800, 600)
 
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
             print("Ignoring empty camera frame.")
             continue
+        # 每帧都刷新置顶状态，避免鼠标交互取消置顶
 
-        frame = cv2.flip(frame, 1) # Flip horizontally for intuitive movement
+
+        frame = cv2.flip(frame, 1)  # Flip horizontally for intuitive movement
 
         # Process frame for hand landmarks
         processed_frame, landmarks = hand_tracker.process_frame(frame)
@@ -40,18 +49,23 @@ def main():
         recognized_gesture_name, gesture_data = gesture_recognizer.recognize(landmarks)
 
         # Update display gesture
-        # Show "Scroll Mode" even if no scroll action, but prioritize actual actions for display
-        if recognized_gesture_name != config.GESTURE_NONE :
+        # Only update current_display_gesture if it's not GESTURE_NONE or if it's an actionable gesture
+        if recognized_gesture_name != config.GESTURE_NONE:
             current_display_gesture = recognized_gesture_name
-            if gesture_data.get('performed_action', False): # If gesture_recognizer flagged it as an action
-                 last_actionable_gesture = recognized_gesture_name
-
+            # If the gesture was actionable, store it as the last actionable one
+            if gesture_data.get('performed_action', False):
+                last_actionable_gesture = recognized_gesture_name
+        else:
+            # If no gesture is currently recognized, revert to "No Gesture" for current display,
+            # but keep last_actionable_gesture
+            current_display_gesture = config.GESTURE_NONE
 
         # Execute action based on gesture
-        if recognized_gesture_name != config.GESTURE_NONE and recognized_gesture_name != config.GESTURE_SCROLL_MODE_ENGAGED :
-             # Don't execute for "No Gesture" or purely informational "Scroll Mode Engaged"
+        # We only execute if a specific action was recognized AND it's not purely informational (like SCROLL_MODE_ENGAGED)
+        if recognized_gesture_name != config.GESTURE_NONE and \
+                recognized_gesture_name != config.GESTURE_SCROLL_MODE_ENGAGED and \
+                gesture_data.get('performed_action', False):  # Ensure it's an actionable gesture from the recognizer
             action_controller.execute_action(recognized_gesture_name, gesture_data)
-
 
         # Display information on frame
         # Display current active profile
@@ -62,31 +76,40 @@ def main():
         # Display the most relevant gesture
         display_text = current_display_gesture
         if current_display_gesture == config.GESTURE_NONE and last_actionable_gesture != config.GESTURE_NONE:
-            # If current is none, but we had a recent action, briefly show it or show "No Gesture"
-             display_text = f"Last: {last_actionable_gesture}" # Or just GESTURE_NONE
-        elif current_display_gesture == config.GESTURE_SCROLL_MODE_ENGAGED and last_actionable_gesture not in [config.GESTURE_SCROLL_UP, config.GESTURE_SCROLL_DOWN]:
-            display_text = config.GESTURE_SCROLL_MODE_ENGAGED # Show scroll mode if it's active and not actually scrolling
-        elif gesture_data.get('performed_action'):
-             display_text = recognized_gesture_name
-
+            display_text = f"Last Action: {last_actionable_gesture}"  # Show last action if current is none
+        elif current_display_gesture == config.GESTURE_SCROLL_MODE_ENGAGED:
+            display_text = config.GESTURE_SCROLL_MODE_ENGAGED  # Prioritize showing scroll mode if active
 
         cv2.putText(processed_frame, display_text, (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
         cv2.imshow('Gesture Control HCI', processed_frame)
 
+        # --- FPS Calculation ---
+        curr_time = time.time()
+        fps = 1.0 / (curr_time - prev_time)
+        prev_time = curr_time
+
+        # Show FPS
+        fps_text = f"FPS: {fps:.1f}"
+        cv2.putText(processed_frame, fps_text, (10, 110),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+
+        cv2.imshow('Gesture Control HCI', processed_frame)
+
         key = cv2.waitKey(5) & 0xFF
         if key == ord('q'):
             break
-        elif key == ord('p'): # Manual profile cycling for demo
+        elif key == ord('p'):  # Manual profile cycling for demo
             app_detector.cycle_app_profile()
-            action_controller.update_profile() # Ensure controller knows
-            last_actionable_gesture = config.GESTURE_NONE # Reset last action display
+            action_controller.update_profile()  # Ensure controller knows
+            last_actionable_gesture = config.GESTURE_NONE  # Reset last action display
 
     cap.release()
     cv2.destroyAllWindows()
     hand_tracker.close()
     print("Gesture Control HCI Stopped.")
+
 
 if __name__ == '__main__':
     main()
