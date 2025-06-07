@@ -9,7 +9,8 @@ _current_app_profile_name = "default" # Default profile
 SUPPORTED_PROFILES = {
     "default": "Default Profile",
     "browser": "Web Browser Profile",
-    "douyin": "Douyin/TikTok Profile" # Added Douyin profile
+    "douyin": "Douyin Profile",
+    "bilibili": "bilibili Profile"  # Added Douyin profile
 }
 _profile_keys = list(SUPPORTED_PROFILES.keys())
 _current_profile_index = 0 # Ensure this starts at 'default' if 'default' is the first key
@@ -33,10 +34,12 @@ def get_active_application_profile():
             if active_window:
                 window_title = active_window.title.lower()
                 # print(f"Active window: {window_title}") # For debugging
-                if "抖音" in window_title or "tiktok" in window_title:
+                if "抖音" in window_title:
                     return "douyin"
-                elif "chrome" in window_title or "firefox" in window_title or "edge" in window_title or "safari" in window_title:
+                elif "chrome" in window_title or "firefox" in window_title or "edge" in window_title:
                     return "browser"
+                elif "哔哩哔哩" in window_title:
+                    return "bilibili"
                 # Add other application detection logic here
         except Exception as e:
             # print(f"Error detecting active window: {e}") # Might be too noisy

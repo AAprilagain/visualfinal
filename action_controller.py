@@ -25,6 +25,11 @@ BASE_ACTIONS = {
     "press_x": lambda **kwargs: pyautogui.press('x'),
     "press_z": lambda **kwargs: pyautogui.press('z'),
     "press_space": lambda **kwargs: pyautogui.press('space'),
+    "press_f": lambda **kwargs: pyautogui.press('f'),
+    "press_h": lambda **kwargs: pyautogui.press('h'),
+    "press_esc": lambda **kwargs: pyautogui.press('esc'),
+
+
 }
 
 # --- Define Gesture Mappings for Different Application Profiles ---
@@ -33,15 +38,17 @@ APP_GESTURE_MAPPINGS = {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
         config.GESTURE_LEFT_CLICK: "left_click",
         config.GESTURE_DOUBLE_CLICK: "double_click",
-        config.GESTURE_DRAG_START: "mouse_down_left",
-        config.GESTURE_DRAGGING: "mouse_drag",
-        config.GESTURE_DRAG_DROP: "mouse_up_left",
+        config.GESTURE_DRAG_START: "left_click",
+        config.GESTURE_DRAGGING: "do_nothing",
+        config.GESTURE_DRAG_DROP: "do_nothing",
         config.GESTURE_SCROLL_UP: "scroll",
         config.GESTURE_SCROLL_DOWN: "scroll",
         config.GESTURE_SWIPE_LEFT: "hotkey_left",
         config.GESTURE_SWIPE_RIGHT: "hotkey_right",
         config.GESTURE_SWIPE_UP: "hotkey_up",
         config.GESTURE_SWIPE_DOWN: "hotkey_down",
+        config.GESTURE_FIST_TO_OPEN: "press_f", # 新增：握拳到张开 -> 放大
+        config.GESTURE_OPEN_TO_FIST: "press_esc", # 新增：张开到握拳 -> 缩小
     },
     "browser": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
@@ -56,22 +63,43 @@ APP_GESTURE_MAPPINGS = {
         config.GESTURE_SWIPE_RIGHT: "hotkey_alt_right",
         config.GESTURE_SWIPE_UP: "hotkey_up",
         config.GESTURE_SWIPE_DOWN: "hotkey_down",
+        config.GESTURE_FIST_TO_OPEN: "do_nothing", # 新增：握拳到张开 -> 放大
+        config.GESTURE_OPEN_TO_FIST: "do_nothing", # 新增：张开到握拳 -> 缩小
     },
     "douyin": { # New Profile for Douyin/TikTok
         config.GESTURE_MOUSE_MOVING: "mouse_move",
-        config.GESTURE_LEFT_CLICK: "do_nothing",       # Left click disabled
-        config.GESTURE_DOUBLE_CLICK: "do_nothing",     # Optionally disable double click too or map to other action
+        config.GESTURE_LEFT_CLICK: "left_click",       # Left click disabled
+        config.GESTURE_DOUBLE_CLICK: "double_click",     # Optionally disable double click too or map to other action
         config.GESTURE_DRAG_START: "do_nothing",       # Disable dragging by default or map if needed
         config.GESTURE_DRAGGING: "do_nothing",
-        config.GESTURE_DRAG_DROP: "do_nothing",
-        config.GESTURE_SCROLL_UP: "press_space",            # Scroll up maps to 'space' (e.g., play/pause)
-        config.GESTURE_SCROLL_DOWN: "press_x",            # Scroll down maps to 'x' (e.g., next video)
-        config.GESTURE_SWIPE_LEFT: "do_nothing",          # Swipe Left disabled
-        config.GESTURE_SWIPE_RIGHT: "do_nothing",         # Swipe Right disabled
-        config.GESTURE_SWIPE_UP: "hotkey_up",        # Swipe Up (e.g., like)
+        config.GESTURE_DRAG_DROP: "hotkey_up",
+        config.GESTURE_SCROLL_UP: "scroll",            # Scroll up maps to 'space' (e.g., play/pause)
+        config.GESTURE_SCROLL_DOWN: "scroll",            # Scroll down maps to 'x' (e.g., next video)
+        config.GESTURE_SWIPE_LEFT: "hotkey_down",          # Swipe Left disabled
+        config.GESTURE_SWIPE_RIGHT: "hotkey_down",         # Swipe Right disabled
+        config.GESTURE_SWIPE_UP: "hotkey_down",        # Swipe Up (e.g., like)
         config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down (e.g., previous video)
+        config.GESTURE_FIST_TO_OPEN: "press_h",
+        config.GESTURE_OPEN_TO_FIST: "press_esc",
         # Map other gestures as needed, or they will default to "do_nothing" if not in BASE_ACTIONS
-    }
+    },
+    "bilibili": {  # New Profile for bilibili
+            config.GESTURE_MOUSE_MOVING: "mouse_move",
+            config.GESTURE_LEFT_CLICK: "left_click",       # Left click disabled
+            config.GESTURE_DOUBLE_CLICK: "do_nothing",     # Optionally disable double click too or map to other action
+            config.GESTURE_DRAG_START: "do_nothing",       # Disable dragging by default or map if needed
+            config.GESTURE_DRAGGING: "do_nothing",
+            config.GESTURE_DRAG_DROP: "do_nothing",
+            config.GESTURE_SCROLL_UP: "scroll",            # Scroll up maps to 'space' (e.g., play/pause)
+            config.GESTURE_SCROLL_DOWN: "scroll",            # Scroll down maps to 'x' (e.g., next video)
+            config.GESTURE_SWIPE_LEFT: "hotkey_left",          # Swipe Left disabled
+            config.GESTURE_SWIPE_RIGHT: "hotkey_right",         # Swipe Right disabled
+            config.GESTURE_SWIPE_UP: "hotkey_up",        # Swipe Up (e.g., like)
+            config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down (e.g., previous video)
+            config.GESTURE_FIST_TO_OPEN: "press_f", # 新增：握拳到张开 -> 放大
+            config.GESTURE_OPEN_TO_FIST: "press_esc", # 新增：张开到握拳 -> 缩小
+            # Map other gestures as needed, or they will default to "do_nothing" if not in BASE_ACTIONS
+        }
 }
 
 
@@ -107,10 +135,13 @@ class ActionController:
         if action_key and action_key in BASE_ACTIONS:
             action_function = BASE_ACTIONS[action_key]
             try:
+                if action_key == "scroll":
+                    print(f"Executing scroll with amount: {gesture_data.get('amount')}")
                 action_function(**gesture_data)
                 # Only apply swipe action delay if an actual swipe action was performed
                 if gesture_name in [config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT,
-                                    config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN]:
+                                    config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN,
+                                    config.GESTURE_FIST_TO_OPEN, config.GESTURE_OPEN_TO_FIST]: # Add new gestures here
                     time.sleep(config.SWIPE_ACTION_DELAY)
             except Exception as e:
                 print(f"Error executing action '{action_key}' for gesture '{gesture_name}': {e}")

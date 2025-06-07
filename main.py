@@ -1,8 +1,5 @@
 import cv2
-import time
-
 import config
-import utils
 from hand_tracker import HandTracker
 from gesture_recognizer import GestureRecognizer
 from action_controller import ActionController
@@ -46,10 +43,8 @@ def main():
             # If the gesture was actionable, store it as the last actionable one
             if gesture_data.get('performed_action', False):
                  last_actionable_gesture = recognized_gesture_name
-        else:
-            # If no gesture is currently recognized, revert to "No Gesture" for current display,
-            # but keep last_actionable_gesture
-            current_display_gesture = config.GESTURE_NONE
+        # else: # Removed this else block to maintain display of continuous gestures like MOUSE_MOVING
+        #     current_display_gesture = config.GESTURE_NONE
 
 
         # Execute action based on gesture
@@ -68,10 +63,14 @@ def main():
 
         # Display the most relevant gesture
         display_text = current_display_gesture
-        if current_display_gesture == config.GESTURE_NONE and last_actionable_gesture != config.GESTURE_NONE:
+        # Prioritize showing scroll mode if active, or mouse moving if active
+        if recognized_gesture_name == config.GESTURE_SCROLL_MODE_ENGAGED:
+            display_text = config.GESTURE_SCROLL_MODE_ENGAGED
+        elif recognized_gesture_name == config.GESTURE_MOUSE_MOVING:
+            display_text = config.GESTURE_MOUSE_MOVING
+        elif current_display_gesture == config.GESTURE_NONE and last_actionable_gesture != config.GESTURE_NONE:
             display_text = f"Last Action: {last_actionable_gesture}" # Show last action if current is none
-        elif current_display_gesture == config.GESTURE_SCROLL_MODE_ENGAGED:
-            display_text = config.GESTURE_SCROLL_MODE_ENGAGED # Prioritize showing scroll mode if active
+
 
         cv2.putText(processed_frame, display_text, (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)

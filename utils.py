@@ -1,6 +1,7 @@
 import numpy as np
 from math import hypot
 import config
+import mediapipe as mp
 
 def calculate_distance_3d(lm1, lm2):
     """Calculates the 3D Euclidean distance between two landmark points."""
@@ -22,21 +23,50 @@ def get_finger_extended_states(landmarks):
     Returns: list[bool]: [Index, Middle, Ring, Pinky]
     """
     states = []
-    # Index, Middle, Ring, Pinky
     # Using more robust check: tip should be significantly higher (lower y) than both DIP and PIP
+    # For each finger (index, middle, ring, pinky)
+    # Check if tip is above (lower y) than DIP, and DIP is above PIP.
+    # This assumes an upright hand posture.
     for tip_idx, dip_idx, pip_idx in [(8, 6, 5), (12, 10, 9), (16, 14, 13), (20, 18, 17)]:
-        # Finger is extended if tip is above DIP and PIP joints
-        # (assuming hand is upright, lower y means higher up)
-        states.append(landmarks[tip_idx].y < landmarks[dip_idx].y and \
-                      landmarks[dip_idx].y < landmarks[pip_idx].y)
+        # Apply FINGER_CURL_TOLERANCE for more robust detection of curled state
+        is_extended = (landmarks[tip_idx].y < landmarks[dip_idx].y - config.FINGER_CURL_TOLERANCE and
+                       landmarks[dip_idx].y < landmarks[pip_idx].y - config.FINGER_CURL_TOLERANCE)
+        states.append(is_extended)
     return states
 
 def is_thumb_extended(landmarks):
     """Checks if the thumb is extended (tip higher than knuckle)."""
     # Thumb is extended if tip (4) is above MCP joint (2)
-    # Adding a small threshold to avoid minor fluctuations
-    return landmarks[4].y < landmarks[3].y and landmarks[3].y < landmarks[2].y
+    # Apply FINGER_CURL_TOLERANCE for more robust detection of curled state
+    return (landmarks[4].y < landmarks[3].y - config.FINGER_CURL_TOLERANCE and
+            landmarks[3].y < landmarks[2].y - config.FINGER_CURL_TOLERANCE)
 
+
+def is_hand_closed_to_fist(landmarks):
+    """
+    Checks if the hand is in a fist-like (closed) position by checking if finger tips
+    are close to the middle finger's MCP joint (a proxy for palm center).
+    """
+    # Define finger tip landmarks
+    finger_tips = [
+        landmarks[mp.solutions.hands.HandLandmark.THUMB_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.RING_FINGER_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.PINKY_TIP]
+    ]
+
+    # Define the "palm center" as the middle finger's MCP joint
+    palm_center_lm = landmarks[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP]
+
+    # Check if all finger tips are "close" to the palm center
+    for tip in finger_tips:
+        dist_to_palm_center = calculate_distance_3d(tip, palm_center_lm)
+        # Use FIST_CLOSED_THRESHOLD from config
+        if dist_to_palm_center > config.FIST_CLOSED_THRESHOLD:
+            return False
+
+    return True
 
 def map_to_screen(x_normalized, y_normalized):
     """Maps normalized hand coordinates to actual screen coordinates."""
