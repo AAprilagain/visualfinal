@@ -64,33 +64,8 @@ def processing_worker(hand_tracker, gesture_recognizer, frame_q, result_q, stop_
         except queue.Empty:
             continue
 
-        # frame_to_process = cv2.resize(frame, (960, 540))  # 调整到期望的分辨率
-        # processed_frame_display, landmarks = hand_tracker.py.process_frame(frame_to_process)
         processed_frame_display, landmarks = hand_tracker.process_frame(frame)
         recognized_gesture, gesture_data = gesture_recognizer.recognize(landmarks)
-        # start_ht = time.time()
-        # processed_frame_display, landmarks = hand_tracker.py.process_frame(frame)
-        # end_ht = time.time()
-        # time_ht_ms = (end_ht - start_ht) * 1000
-        # #
-        # time_gr_ms = 0
-        # recognized_gesture = config.GESTURE_NONE  # 默认值
-        # gesture_data = {}  # 默认值
-        # #
-        # if landmarks:  # 仅当检测到手部时才进行手势识别
-        #     # 2. 测量手势识别耗时
-        #     start_gr = time.time()
-        #     recognized_gesture, gesture_data = gesture_recognizer.recognize(landmarks)
-        #     end_gr = time.time()
-        #     time_gr_ms = (end_gr - start_gr) * 1000
-        # else:
-        #     # 如果没有检测到手，也应该准备一个默认的 "无手势" 结果放入队列
-        #     recognized_gesture = config.GESTURE_NONE
-        #     gesture_data = {'performed_action': False}  # 确保 gesture_data 结构一致
-        #
-        # 打印耗时，有助于定位问题
-        # print(
-        #     f"HandTracker: {time_ht_ms:.2f} ms, GestureRecognizer: {time_gr_ms:.2f} ms, Total: {(time_ht_ms + time_gr_ms):.2f} ms")
 
         try:
             result_q.put((recognized_gesture, gesture_data, processed_frame_display), block=False)
@@ -119,78 +94,49 @@ def main_threaded():  # 重命名原来的 main
     cam_thread.start()
     proc_thread.start()
 
-    current_display_gesture = config.GESTURE_NONE  #
-    last_actionable_gesture = config.GESTURE_NONE  #
-    # ... 其他局部变量 ...
+    current_display_gesture = config.GESTURE_NONE 
+    last_actionable_gesture = config.GESTURE_NONE 
+    hwnd = None
     prev_time_main = time.time()
-
-    cursor_overlay_visible = False
-    cursor_window_name = "GestureCursorOverlay"
-    # 创建一个带alpha通道的半透明黄色圆圈图像 (BGRA)
-    cursor_size = 30
-    radius = 10
-    cursor_image = np.zeros((cursor_size, cursor_size, 4), dtype=np.uint8)
-    cv2.circle(cursor_image, (cursor_size // 2, cursor_size // 2), radius, (0, 215, 255, 180),
-               -1)  # BGR, Alpha (黄色, 半透明)
 
     try:
         while not stop_event.is_set():  # 主循环检查 stop_event
             try:
-                # _main_get_start_time = time.perf_counter()
                 recognized_gesture_name, gesture_data, display_frame = result_queue.get(block=True,
                                                                                         timeout=0.03)  # 假设超时是0.03秒
-                # _main_get_duration_ms = (time.perf_counter() - _main_get_start_time) * 1000
-                # if _main_get_duration_ms > 25:  # 如果获取时间接近超时时间 (例如 > 25ms for a 30ms timeout)
-                #     print(f"DEBUG: MainThread: result_queue.get() took {_main_get_duration_ms:.2f} ms")
             except queue.Empty:
-                # print(f"DEBUG: MainThread: result_queue.get() TIMED OUT (耗时约30ms)")
                 # 如果队列为空，仍然可以处理键盘输入和更新窗口置顶
                 key = cv2.waitKey(1) & 0xFF  # 保持UI响应
                 if key == ord('q'):
                     stop_event.set()
                     break
-                # ... 其他按键处理 ...
-                # if sys.platform == "win32" and hwnd:  # hwnd需在此作用域可见
-                #     ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, FLAGS)  #
                 continue  # 没有新结果则继续循环
-
-            # success, frame = cap.read()
-            # frame = cv2.flip(frame, 1)  # Flip horizontally for intuitive movement
-
-            # Process frame for hand landmarks
-            # processed_frame, landmarks = hand_tracker.py.process_frame(frame)
 
             # --- Action Execution ---
             if recognized_gesture_name != config.GESTURE_NONE and \
                     recognized_gesture_name != config.GESTURE_SCROLL_MODE_ENGAGED and \
                     gesture_data.get('performed_action', False):
-                # _action_exec_start_time = time.perf_counter()
                 action_controller.execute_action(recognized_gesture_name, gesture_data)
-                # _action_exec_duration_ms = (time.perf_counter() - _action_exec_start_time) * 1000
-                # if _action_exec_duration_ms > 10:  # 如果动作执行超过10ms，打印出来
-                #     print(
-                #         f"DEBUG: MainThread: execute_action('{recognized_gesture_name}') took {_action_exec_duration_ms:.2f} ms")
 
             # --- Update Display Text and Show Frame ---
-            # (与原 main.py 类似，但使用从队列获取的 display_frame)
-            if recognized_gesture_name != config.GESTURE_NONE:  #
-                current_display_gesture = recognized_gesture_name  #
-                if gesture_data.get('performed_action', False):  #
-                    last_actionable_gesture = recognized_gesture_name  #
+            if recognized_gesture_name != config.GESTURE_NONE: 
+                current_display_gesture = recognized_gesture_name 
+                if gesture_data.get('performed_action', False): 
+                    last_actionable_gesture = recognized_gesture_name 
             else:
-                current_display_gesture = config.GESTURE_NONE  #
+                current_display_gesture = config.GESTURE_NONE 
 
-            profile_text = f"Profile: {app_detector.get_current_profile_display_name()}"  #
+            profile_text = f"Profile: {app_detector.get_current_profile_display_name()}" 
             cv2.putText(display_frame, profile_text, (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)  #
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA) 
 
-            display_text = current_display_gesture  #
+            display_text = current_display_gesture 
             if current_display_gesture == config.GESTURE_NONE and last_actionable_gesture != config.GESTURE_NONE:  #
-                display_text = f"Last Action: {last_actionable_gesture}"  #
-            elif current_display_gesture == config.GESTURE_SCROLL_MODE_ENGAGED:  #
-                display_text = config.GESTURE_SCROLL_MODE_ENGAGED  #
+                display_text = f"Last Action: {last_actionable_gesture}" 
+            elif current_display_gesture == config.GESTURE_SCROLL_MODE_ENGAGED: 
+                display_text = config.GESTURE_SCROLL_MODE_ENGAGED 
             cv2.putText(display_frame, display_text, (10, 70),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)  #
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA) 
 
             # --- FPS Calculation for main loop---
             curr_time_main = time.time()
@@ -204,6 +150,14 @@ def main_threaded():  # 重命名原来的 main
             cv2.imshow('Gesture Control HCI', display_frame)  #
             result_queue.task_done()
 
+            if sys.platform == "win32":
+                if hwnd is None:
+                    # Find the window handle ONLY ONCE after it has been created
+                    hwnd = ctypes.windll.user32.FindWindowW(None, "Gesture Control HCI")
+                if hwnd:
+                    # Set the window to be topmost in every loop iteration
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, FLAGS)
+
             key = cv2.waitKey(1) & 0xFF  # 保持UI响应
             if key == ord('q'):
                 stop_event.set()
@@ -212,17 +166,7 @@ def main_threaded():  # 重命名原来的 main
                 app_detector.cycle_app_profile()  #
                 action_controller.update_profile()  #
                 last_actionable_gesture = config.GESTURE_NONE  #
-    #
-    # if sys.platform == "win32" and hwnd:  # hwnd需在此作用域可见
-    #    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, FLAGS)  #
 
-    # profiler = cProfile.Profile()
-    # profiler.enable()
-    # processed_frame, landmarks = hand_tracker.py.process_frame(frame)
-    # recognized_gesture_name, gesture_data = gesture_recognizer.recognize(landmarks)
-    # profiler.disable()
-    # stats = pstats.Stats(profiler).sort_stats('cumtime')
-    # stats.print_stats(10)
 
     finally:
         print("Stopping threads...")

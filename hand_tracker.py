@@ -2,16 +2,15 @@ import cv2
 import mediapipe as mp
 import config
 
-
 class HandTracker:
     def __init__(self):
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
-            static_image_mode=False,  # 明确设置为False，用于视频流
+            static_image_mode=False,
             model_complexity=1,
-            max_num_hands=config.MAX_NUM_HANDS,  #
-            min_detection_confidence=config.MIN_DETECTION_CONFIDENCE,  #
-            min_tracking_confidence=config.MIN_TRACKING_CONFIDENCE  #
+            max_num_hands=config.MAX_NUM_HANDS,
+            min_detection_confidence=config.MIN_DETECTION_CONFIDENCE,
+            min_tracking_confidence=config.MIN_TRACKING_CONFIDENCE
         )
         self.mp_draw = mp.solutions.drawing_utils
 
