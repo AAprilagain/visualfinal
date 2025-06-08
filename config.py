@@ -98,3 +98,74 @@ STATE_SCROLL_MODE = "SCROLL_MODE"
 STATE_SWIPE_PENDING = "SWIPE_PENDING"
 STATE_HAND_CLOSED_STEADY = "HAND_CLOSED_STEADY"
 STATE_HAND_OPEN_STEADY = "HAND_OPEN_STEADY"
+
+CUSTOM_APP_GESTURE_MAPPINGS = {
+    "default": {
+        GESTURE_MOUSE_MOVING: "mouse_move",
+        GESTURE_LEFT_CLICK: "left_click",
+        GESTURE_DOUBLE_CLICK: "double_click",
+        GESTURE_DRAG_START: "left_click",
+        GESTURE_DRAGGING: "do_nothing",
+        GESTURE_DRAG_DROP: "do_nothing",
+        GESTURE_SCROLL_UP: "scroll",
+        GESTURE_SCROLL_DOWN: "scroll",
+        GESTURE_SWIPE_LEFT: "hotkey_left",
+        GESTURE_SWIPE_RIGHT: "hotkey_right",
+        GESTURE_SWIPE_UP: "hotkey_up",
+        GESTURE_SWIPE_DOWN: "hotkey_down",
+        GESTURE_FIST_TO_OPEN: "press_f",
+        GESTURE_OPEN_TO_FIST: "press_esc",
+    },
+    "browser": {
+        GESTURE_MOUSE_MOVING: "mouse_move",
+        GESTURE_LEFT_CLICK: "left_click",
+        GESTURE_DOUBLE_CLICK: "double_click",
+        GESTURE_DRAG_START: "mouse_down_left",
+        GESTURE_DRAGGING: "mouse_drag",
+        GESTURE_DRAG_DROP: "mouse_up_left",
+        GESTURE_SCROLL_UP: "scroll",
+        GESTURE_SCROLL_DOWN: "scroll",
+        GESTURE_SWIPE_LEFT: "hotkey_alt_left",
+        GESTURE_SWIPE_RIGHT: "hotkey_alt_right",
+        GESTURE_SWIPE_UP: "hotkey_up",
+        GESTURE_SWIPE_DOWN: "hotkey_down",
+        GESTURE_FIST_TO_OPEN: "do_nothing",
+        GESTURE_OPEN_TO_FIST: "do_nothing",
+    },
+    "douyin": {
+        GESTURE_MOUSE_MOVING: "mouse_move",
+        GESTURE_LEFT_CLICK: "left_click",
+        GESTURE_DOUBLE_CLICK: "double_click",
+        GESTURE_DRAG_START: "do_nothing",
+        GESTURE_DRAGGING: "do_nothing",
+        GESTURE_DRAG_DROP: "hotkey_up",
+        GESTURE_SCROLL_UP: "scroll",
+        GESTURE_SCROLL_DOWN: "scroll",
+        GESTURE_SWIPE_LEFT: "hotkey_down",
+        GESTURE_SWIPE_RIGHT: "hotkey_down",
+        GESTURE_SWIPE_UP: "hotkey_down",
+        GESTURE_SWIPE_DOWN: "hotkey_down",
+        GESTURE_FIST_TO_OPEN: "press_h",
+        GESTURE_OPEN_TO_FIST: "press_esc",
+    },
+    "bilibili": {
+        GESTURE_MOUSE_MOVING: "mouse_move",
+        GESTURE_LEFT_CLICK: "left_click",
+        GESTURE_DOUBLE_CLICK: "do_nothing",
+        GESTURE_DRAG_START: "do_nothing",
+        GESTURE_DRAGGING: "do_nothing",
+        GESTURE_DRAG_DROP: "do_nothing",
+        GESTURE_SCROLL_UP: "scroll",
+        GESTURE_SCROLL_DOWN: "scroll",
+        GESTURE_SWIPE_LEFT: "hotkey_left",
+        GESTURE_SWIPE_RIGHT: "hotkey_right",
+        GESTURE_SWIPE_UP: "hotkey_up",
+        GESTURE_SWIPE_DOWN: "hotkey_down",
+        GESTURE_FIST_TO_OPEN: "press_f",
+        GESTURE_OPEN_TO_FIST: "press_esc",
+    }
+}
+
+# Add a list of all available action keys for the dropdowns in the UI
+AVAILABLE_ACTIONS = list(set(action for profile_actions in CUSTOM_APP_GESTURE_MAPPINGS.values() for action in profile_actions.values()))
+AVAILABLE_ACTIONS.sort() # Sort for consistent display
