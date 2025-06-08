@@ -47,8 +47,8 @@ APP_GESTURE_MAPPINGS = {
         config.GESTURE_SWIPE_RIGHT: "hotkey_right",
         config.GESTURE_SWIPE_UP: "hotkey_up",
         config.GESTURE_SWIPE_DOWN: "hotkey_down",
-        config.GESTURE_FIST_TO_OPEN: "press_f", # 新增：握拳到张开 -> 放大
-        config.GESTURE_OPEN_TO_FIST: "press_esc", # 新增：张开到握拳 -> 缩小
+        config.GESTURE_FIST_TO_OPEN: "press_f", 
+        config.GESTURE_OPEN_TO_FIST: "press_esc", 
     },
     "browser": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
@@ -63,42 +63,40 @@ APP_GESTURE_MAPPINGS = {
         config.GESTURE_SWIPE_RIGHT: "hotkey_alt_right",
         config.GESTURE_SWIPE_UP: "hotkey_up",
         config.GESTURE_SWIPE_DOWN: "hotkey_down",
-        config.GESTURE_FIST_TO_OPEN: "do_nothing", # 新增：握拳到张开 -> 放大
-        config.GESTURE_OPEN_TO_FIST: "do_nothing", # 新增：张开到握拳 -> 缩小
+        config.GESTURE_FIST_TO_OPEN: "do_nothing",
+        config.GESTURE_OPEN_TO_FIST: "do_nothing",
     },
-    "douyin": { # New Profile for Douyin/TikTok
+    "douyin": {
         config.GESTURE_MOUSE_MOVING: "mouse_move",
-        config.GESTURE_LEFT_CLICK: "left_click",       # Left click disabled
-        config.GESTURE_DOUBLE_CLICK: "double_click",     # Optionally disable double click too or map to other action
-        config.GESTURE_DRAG_START: "do_nothing",       # Disable dragging by default or map if needed
+        config.GESTURE_LEFT_CLICK: "left_click",
+        config.GESTURE_DOUBLE_CLICK: "double_click",
+        config.GESTURE_DRAG_START: "do_nothing",
         config.GESTURE_DRAGGING: "do_nothing",
         config.GESTURE_DRAG_DROP: "hotkey_up",
-        config.GESTURE_SCROLL_UP: "scroll",            # Scroll up maps to 'space' (e.g., play/pause)
-        config.GESTURE_SCROLL_DOWN: "scroll",            # Scroll down maps to 'x' (e.g., next video)
-        config.GESTURE_SWIPE_LEFT: "hotkey_down",          # Swipe Left disabled
-        config.GESTURE_SWIPE_RIGHT: "hotkey_down",         # Swipe Right disabled
-        config.GESTURE_SWIPE_UP: "hotkey_down",        # Swipe Up (e.g., like)
-        config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down (e.g., previous video)
+        config.GESTURE_SCROLL_UP: "scroll",
+        config.GESTURE_SCROLL_DOWN: "scroll",
+        config.GESTURE_SWIPE_LEFT: "hotkey_down",
+        config.GESTURE_SWIPE_RIGHT: "hotkey_down",
+        config.GESTURE_SWIPE_UP: "hotkey_down",
+        config.GESTURE_SWIPE_DOWN: "hotkey_down",
         config.GESTURE_FIST_TO_OPEN: "press_h",
         config.GESTURE_OPEN_TO_FIST: "press_esc",
-        # Map other gestures as needed, or they will default to "do_nothing" if not in BASE_ACTIONS
     },
-    "bilibili": {  # New Profile for bilibili
+    "bilibili": {
             config.GESTURE_MOUSE_MOVING: "mouse_move",
-            config.GESTURE_LEFT_CLICK: "left_click",       # Left click disabled
-            config.GESTURE_DOUBLE_CLICK: "do_nothing",     # Optionally disable double click too or map to other action
-            config.GESTURE_DRAG_START: "do_nothing",       # Disable dragging by default or map if needed
+            config.GESTURE_LEFT_CLICK: "left_click",
+            config.GESTURE_DOUBLE_CLICK: "do_nothing",
+            config.GESTURE_DRAG_START: "do_nothing",
             config.GESTURE_DRAGGING: "do_nothing",
             config.GESTURE_DRAG_DROP: "do_nothing",
-            config.GESTURE_SCROLL_UP: "scroll",            # Scroll up maps to 'space' (e.g., play/pause)
-            config.GESTURE_SCROLL_DOWN: "scroll",            # Scroll down maps to 'x' (e.g., next video)
-            config.GESTURE_SWIPE_LEFT: "hotkey_left",          # Swipe Left disabled
-            config.GESTURE_SWIPE_RIGHT: "hotkey_right",         # Swipe Right disabled
-            config.GESTURE_SWIPE_UP: "hotkey_up",        # Swipe Up (e.g., like)
-            config.GESTURE_SWIPE_DOWN: "hotkey_down",      # Swipe Down (e.g., previous video)
-            config.GESTURE_FIST_TO_OPEN: "press_f", # 新增：握拳到张开 -> 放大
-            config.GESTURE_OPEN_TO_FIST: "press_esc", # 新增：张开到握拳 -> 缩小
-            # Map other gestures as needed, or they will default to "do_nothing" if not in BASE_ACTIONS
+            config.GESTURE_SCROLL_UP: "scroll",
+            config.GESTURE_SCROLL_DOWN: "scroll",
+            config.GESTURE_SWIPE_LEFT: "hotkey_left",
+            config.GESTURE_SWIPE_RIGHT: "hotkey_right",
+            config.GESTURE_SWIPE_UP: "hotkey_up",
+            config.GESTURE_SWIPE_DOWN: "hotkey_down",
+            config.GESTURE_FIST_TO_OPEN: "press_f",
+            config.GESTURE_OPEN_TO_FIST: "press_esc",
         }
 }
 
@@ -110,6 +108,10 @@ class ActionController:
         self.current_gesture_map = APP_GESTURE_MAPPINGS.get(self.active_profile_name, APP_GESTURE_MAPPINGS["default"])
         print(f"ActionController initialized with profile: {self.active_profile_name}")
 
+        # --- 新增代码 ---
+        # 用于记录冷却截止的时间戳，初始化为0.0表示没有冷却
+        self.cooldown_until = 0.0
+
     def update_profile(self):
         new_profile_name = app_detector.get_active_application_profile()
         if new_profile_name != self.active_profile_name:
@@ -119,31 +121,44 @@ class ActionController:
 
 
     def execute_action(self, gesture_name, gesture_data=None):
-        """
-        Executes a pyautogui action based on the recognized gesture and current app profile.
-        Args:
-            gesture_name (str): The name of the gesture from config.py (e.g., config.GESTURE_LEFT_CLICK).
-            gesture_data (dict, optional): Data associated with the gesture.
-        """
+        # --- 新增代码：非阻塞冷却检查 ---
+        # 1. 定义哪些是需要被冷却的“大动作”
+        major_gestures = [
+            config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT,
+            config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN,
+            config.GESTURE_FIST_TO_OPEN, config.GESTURE_OPEN_TO_FIST
+        ]
+
+        # 2. 修改判断条件：仅当“处于冷却期”并且“当前手势是大动作”时，才屏蔽它
+        if time.time() < self.cooldown_until and gesture_name in major_gestures:
+            return  # 屏蔽连续的大动作
+
+        # 如果是捏合/拖拽/移动等小动作，则会跳过上面的if判断，继续执行
         if gesture_data is None:
             gesture_data = {}
 
-        self.update_profile() # Check if profile changed
+        self.update_profile()
 
         action_key = self.current_gesture_map.get(gesture_name)
 
         if action_key and action_key in BASE_ACTIONS:
             action_function = BASE_ACTIONS[action_key]
+
             try:
-                if action_key == "scroll":
-                    print(f"Executing scroll with amount: {gesture_data.get('amount')}")
+                # --- 在此添加调试打印 ---
+                if action_key in ["mouse_move", "mouse_drag"]:
+                    x, y = gesture_data.get('x'), gesture_data.get('y')
+                    print(f"DEBUG: Executing {action_key} to screen coordinates: X={x}, Y={y}")
+                # --- 调试代码结束 ---
+                
                 action_function(**gesture_data)
-                # Only apply swipe action delay if an actual swipe action was performed
+
+                # --- 修改代码：用设置冷却时间戳替换 time.sleep() ---
                 if gesture_name in [config.GESTURE_SWIPE_LEFT, config.GESTURE_SWIPE_RIGHT,
                                     config.GESTURE_SWIPE_UP, config.GESTURE_SWIPE_DOWN,
-                                    config.GESTURE_FIST_TO_OPEN, config.GESTURE_OPEN_TO_FIST]: # Add new gestures here
-                    time.sleep(config.SWIPE_ACTION_DELAY)
+                                    config.GESTURE_FIST_TO_OPEN, config.GESTURE_OPEN_TO_FIST]:
+                    # 不再使用 time.sleep()，而是更新冷却截止时间
+                    self.cooldown_until = time.time() + config.SWIPE_ACTION_DELAY
+                    
             except Exception as e:
                 print(f"Error executing action '{action_key}' for gesture '{gesture_name}': {e}")
-        # else:
-        #     print(f"No action mapped for gesture '{gesture_name}' in profile '{self.active_profile_name}' or default, or action_key not in BASE_ACTIONS.")

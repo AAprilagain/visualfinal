@@ -1,330 +1,278 @@
 import time
 import config
 import utils
+from collections import deque
 
 class GestureRecognizer:
     def __init__(self):
-        self.current_state = config.STATE_IDLE
+        # --- State Definitions ---
+        self.STATE_IDLE = "IDLE"
+        self.STATE_PINCH_DETECTED = "PINCH_DETECTED"
+        self.STATE_POSSIBLE_DOUBLE_CLICK = "POSSIBLE_DOUBLE_CLICK"
+        self.STATE_DRAGGING = "DRAGGING"
+        # NEW: Renamed states for clarity and purpose
+        self.STATE_FIST_STEADY = "FIST_STEADY" # Waiting in a fist posture
+        self.STATE_OPEN_HAND_STEADY = "OPEN_HAND_STEADY" # Waiting in an open hand posture
+        self.STATE_MOUSE_MOVING = "MOUSE_MOVING"
+        self.STATE_SCROLL_MODE = "SCROLL_MODE"
+        self.STATE_THUMBS_UP_SCROLL = "THUMBS_UP_SCROLL"
+        
+        self.current_state = self.STATE_IDLE
 
-        self.pinch_start_time = 0.0
+        # --- Timers & Counters ---
+        self.state_start_time = 0.0
         self.last_click_time = 0.0
-        self.pinch_start_screen_pos = (0, 0)
-        self.last_mouse_pos_normalized = (0, 0) # For mouse movement smoothing
+        self.scroll_posture_start_time = 0.0
+        self.last_reset_time = 0.0
 
-        self.scroll_mode_engaged_time = 0.0
-        self.prev_middle_finger_tip_y = None
-
-        self.swipe_start_time = 0.0
-        self.swipe_start_wrist_pos = None
-        self.last_gesture_time = 0.0
-
-        self.last_hand_open_detected_time = 0.0
-        self.last_hand_closed_detected_time = 0.0
-
+        # --- Positions & Data ---
+        self.smoothed_mouse_pos_normalized = (0, 0)
+        self.is_new_movement_gesture = True
         self.prev_landmarks = None
-
-        self.mouse_move_start_time = 0.0
-        self.mouse_move_hold_threshold = 0.1
-
+        self.prev_scroll_y = None
+        self.wrist_velocity_tracker = deque(maxlen=5) # For swipe detection
 
     def _reset_all_states(self):
-        """Resets all internal states to IDLE and clears all timers/positions."""
-        self.current_state = config.STATE_IDLE
-        self.pinch_start_time = 0.0
+        # Reset all state variables to their initial values
+        self.current_state = self.STATE_IDLE
+        self.state_start_time = 0.0
         self.last_click_time = 0.0
-        self.pinch_start_screen_pos = (0, 0)
-        self.scroll_mode_engaged_time = 0.0
-        self.prev_middle_finger_tip_y = None
-        self.swipe_start_time = 0.0
-        self.swipe_start_wrist_pos = None
-        self.prev_landmarks = None # Keep this reset for clean state after no hand/action
-        self.last_hand_open_detected_time = 0.0
-        self.last_hand_closed_detected_time = 0.0
-        self.mouse_move_start_time = 0.0
+        self.scroll_posture_start_time = 0.0
+        self.is_new_movement_gesture = True
+        self.prev_scroll_y = None
+        self.wrist_velocity_tracker.clear()
+        self.last_reset_time = time.time()
+        
+    def _enter_state(self, state):
+        # Helper function to transition to a new state and reset the timer
+        self.current_state = state
+        self.state_start_time = time.time()
 
-
-    def _reset_all_states_except_mouse_pos(self):
-        """Resets most internal states, but preserves last_mouse_pos_normalized for smoother mouse control."""
-        # Note: prev_landmarks will still be reset here, which is usually fine for mode changes
-        self.pinch_start_time = 0.0
-        self.last_click_time = 0.0
-        self.pinch_start_screen_pos = (0, 0)
-        self.scroll_mode_engaged_time = 0.0
-        self.prev_middle_finger_tip_y = None
-        self.swipe_start_time = 0.0
-        self.swipe_start_wrist_pos = None
-        self.prev_landmarks = None
-        self.last_hand_open_detected_time = 0.0
-        self.last_hand_closed_detected_time = 0.0
-        self.mouse_move_start_time = 0.0
+    def _apply_smoothing(self, raw_pos):
+        # Applies exponential moving average to smooth mouse movements
+        if self.is_new_movement_gesture:
+            self.smoothed_mouse_pos_normalized = raw_pos
+            self.is_new_movement_gesture = False
+        else:
+            prev_smooth_x, prev_smooth_y = self.smoothed_mouse_pos_normalized
+            smooth_x = prev_smooth_x + config.MOUSE_SMOOTHING_FACTOR * (raw_pos[0] - prev_smooth_x)
+            smooth_y = prev_smooth_y + config.MOUSE_SMOOTHING_FACTOR * (raw_pos[1] - prev_smooth_y)
+            self.smoothed_mouse_pos_normalized = (smooth_x, smooth_y)
+        return self.smoothed_mouse_pos_normalized
 
     def recognize(self, hand_landmark_obj):
+
         current_time = time.time()
         recognized_gesture = config.GESTURE_NONE
         gesture_data = {}
 
+        # If hand is lost, handle drag drop and reset state
         if not hand_landmark_obj:
-            if self.current_state == config.STATE_MOUSE_MOVING:
-                recognized_gesture = config.GESTURE_MOUSE_MOVING
-                gesture_data = {'x': utils.map_to_screen(self.last_mouse_pos_normalized[0], self.last_mouse_pos_normalized[1])[0],
-                                'y': utils.map_to_screen(self.last_mouse_pos_normalized[0], self.last_mouse_pos_normalized[1])[1],
-                                'performed_action': True}
-                self._reset_all_states() # Reset to IDLE after sending one last mouse move and hand lost
-            elif self.current_state == config.STATE_DRAGGING:
-                recognized_gesture = config.GESTURE_DRAG_DROP
-                gesture_data = {'performed_action': True}
-                self._reset_all_states()
-            else:
-                self._reset_all_states()
+            if self.current_state == self.STATE_DRAGGING:
+                recognized_gesture, gesture_data['performed_action'] = config.GESTURE_DRAG_DROP, True
+            self._reset_all_states()
             return recognized_gesture, gesture_data
 
+        # --- Landmark & Posture Calculation ---
         actual_landmarks = hand_landmark_obj.landmark
         thumb_tip = actual_landmarks[config.mp_hands.HandLandmark.THUMB_TIP]
         index_tip = actual_landmarks[config.mp_hands.HandLandmark.INDEX_FINGER_TIP]
         middle_tip = actual_landmarks[config.mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
         wrist = actual_landmarks[config.mp_hands.HandLandmark.WRIST]
+        index_mcp = actual_landmarks[config.mp_hands.HandLandmark.INDEX_FINGER_MCP]
 
-        pinch_dist = utils.calculate_distance_3d(thumb_tip, index_tip)
-        current_pinch_is_physically_closed = pinch_dist < config.PINCH_THRESHOLD_CLOSE
-        current_pinch_is_physically_open = pinch_dist > config.PINCH_THRESHOLD_OPEN
+        # 1. 计算一个稳定的“手掌视觉大小”作为参考基准
+        # 我们使用手腕到中指根部指关节的2D距离作为参考
+        wrist_lm = actual_landmarks[config.mp_hands.HandLandmark.WRIST]
+        mcp_lm = actual_landmarks[config.mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+        hand_scale = utils.calculate_landmark_distance_2d(wrist_lm, mcp_lm)
+
+        # 2. 根据参考基准和config中的比例，动态计算当前的阈值
+        dynamic_pinch_close_threshold = hand_scale * config.PINCH_CLOSE_RATIO
+        dynamic_pinch_open_threshold = hand_scale * config.PINCH_OPEN_RATIO
+        
+        # --- 使用新的动态阈值和2D距离进行判断 ---
+        
+        # 计算拇指和食指指尖的2D距离
+        pinch_distance_2d = utils.calculate_landmark_distance_2d(thumb_tip, index_tip)
+
+        # Use robust, orientation-independent posture detection from utils
+        is_fist = utils.is_hand_closed_to_fist(actual_landmarks)
+        is_open_hand = utils.is_hand_fully_open(actual_landmarks)
+        
+        # Keep original finger extension checks for other gestures
+        finger_ext_states = utils.get_finger_extended_states(actual_landmarks)
+        is_thumb_extended = utils.is_thumb_extended(actual_landmarks)
+        is_mouse_move_posture = finger_ext_states[0] and not any(finger_ext_states[1:])
+        is_middle_finger_scroll_posture = finger_ext_states[1] and not any([finger_ext_states[0], finger_ext_states[2], finger_ext_states[3]])
 
         finger_ext_states = utils.get_finger_extended_states(actual_landmarks)
         is_thumb_extended = utils.is_thumb_extended(actual_landmarks)
+        all_four_fingers_curled = not any(finger_ext_states)
 
-        is_hand_fully_open_posture = all(finger_ext_states) and is_thumb_extended
-        is_hand_closed_posture = utils.is_hand_closed_to_fist(actual_landmarks)
+        # Pinch detection remains the same
+        current_pinch_is_physically_closed = pinch_distance_2d < dynamic_pinch_close_threshold
+        current_pinch_is_physically_open = pinch_distance_2d > dynamic_pinch_open_threshold
+        
+        is_basic_thumbs_up = is_thumb_extended and all_four_fingers_curled
+        is_thumbs_up_posture = False # 默认为False
 
-        is_middle_finger_extended = finger_ext_states[1]
-        other_fingers_curled_for_scroll = (not finger_ext_states[0] and
-                                           not finger_ext_states[2] and
-                                           not finger_ext_states[3] and
-                                           not is_thumb_extended)
-
-        is_index_finger_extended = finger_ext_states[0]
-        other_fingers_curled_for_mouse_move = (not finger_ext_states[1] and
-                                               not finger_ext_states[2] and
-                                               not finger_ext_states[3] and
-                                               not is_thumb_extended)
-
-        # --- Hand Open/Closed State Machine (Priority 1) ---
-        # These transitions reset other states and return immediately as they are high-priority mode changes.
-        if is_hand_fully_open_posture:
-            if self.current_state == config.STATE_HAND_CLOSED_STEADY and \
-               (current_time - self.last_hand_closed_detected_time < config.GESTURE_TRANSITION_TIME):
-                recognized_gesture = config.GESTURE_FIST_TO_OPEN
-                self._reset_all_states_except_mouse_pos()
-                self.current_state = config.STATE_HAND_OPEN_STEADY
-                self.last_hand_open_detected_time = current_time
-                self.last_hand_closed_detected_time = 0.0
-                gesture_data['performed_action'] = True
-                print(f"Time: {current_time:.2f}, State: {self.current_state}, Recognized Gesture: {recognized_gesture}, Actionable: {gesture_data.get('performed_action', False)}")
-                # Before returning, update prev_landmarks for subsequent frame
-                self.prev_landmarks = hand_landmark_obj
-                self.last_mouse_pos_normalized = (index_tip.x, index_tip.y)
-                return recognized_gesture, gesture_data
-
-            elif self.current_state != config.STATE_HAND_OPEN_STEADY:
-                self.current_state = config.STATE_HAND_OPEN_STEADY
-            self.last_hand_open_detected_time = current_time
-            self.last_hand_closed_detected_time = 0.0
-
-        elif is_hand_closed_posture:
-            if self.current_state == config.STATE_HAND_OPEN_STEADY and \
-               (current_time - self.last_hand_open_detected_time < config.GESTURE_TRANSITION_TIME):
-                recognized_gesture = config.GESTURE_OPEN_TO_FIST
-                self._reset_all_states_except_mouse_pos()
-                self.current_state = config.STATE_HAND_CLOSED_STEADY
-                self.last_hand_closed_detected_time = current_time
-                self.last_hand_open_detected_time = 0.0
-                gesture_data['performed_action'] = True
-                print(f"Time: {current_time:.2f}, State: {self.current_state}, Recognized Gesture: {recognized_gesture}, Actionable: {gesture_data.get('performed_action', False)}")
-                # Before returning, update prev_landmarks for subsequent frame
-                self.prev_landmarks = hand_landmark_obj
-                self.last_mouse_pos_normalized = (index_tip.x, index_tip.y)
-                return recognized_gesture, gesture_data
-            elif self.current_state != config.STATE_HAND_CLOSED_STEADY:
-                self.current_state = config.STATE_HAND_CLOSED_STEADY
-            self.last_hand_closed_detected_time = current_time
-            self.last_hand_open_detected_time = 0.0
-        else:
-            if self.current_state == config.STATE_HAND_OPEN_STEADY or \
-               self.current_state == config.STATE_HAND_CLOSED_STEADY:
-                self.current_state = config.STATE_IDLE
-            self.last_hand_open_detected_time = 0.0
-            self.last_hand_closed_detected_time = 0.0
-
-        # --- Swipe Gesture (New Position: Before Mouse Moving) ---
-        # Swipe should be checked here, before continuous mouse moving,
-        # especially if it can interrupt mouse moving.
-        # Ensure prev_landmarks is available for calculation
-        if self.prev_landmarks and (current_time - self.last_gesture_time > config.SWIPE_ACTION_DELAY) and is_hand_fully_open_posture:
-            prev_wrist_lm = self.prev_landmarks.landmark[config.mp_hands.HandLandmark.WRIST]
-            dx, dy = utils.calculate_movement_2d_normalized(prev_wrist_lm, wrist)
-            frame_interval = 1 / config.ASSUMED_FPS
-            speed_x = abs(dx) / frame_interval if frame_interval > 0 else 0
-            speed_y = abs(dy) / frame_interval if frame_interval > 0 else 0
-
-            total_dist = utils.calculate_distance_2d((prev_wrist_lm.x, prev_wrist_lm.y), (wrist.x, wrist.y))
-
-            if (speed_x > config.SWIPE_THRESHOLD_SPEED or speed_y > config.SWIPE_THRESHOLD_SPEED) and \
-               total_dist > config.SWIPE_MIN_DISTANCE_NORM:
-                # Swipe detected! Reset all states to ensure clean transition
-                # and prevent mouse moving from immediately taking over.
-                recognized_gesture = config.GESTURE_NONE # Temporarily set to NONE while determining direction
-                if abs(dx) > abs(dy): # Horizontal swipe
-                    if dx > 0: recognized_gesture = config.GESTURE_SWIPE_RIGHT
-                    else: recognized_gesture = config.GESTURE_SWIPE_LEFT
-                else: # Vertical swipe
-                    if dy > 0: recognized_gesture = config.GESTURE_SWIPE_DOWN
-                    else: recognized_gesture = config.GESTURE_SWIPE_UP
-
-                # If a swipe was truly recognized, process it and return.
-                if recognized_gesture != config.GESTURE_NONE:
-                    gesture_data['performed_action'] = True
-                    self.last_gesture_time = current_time
-                    self._reset_all_states() # Full reset after swipe
-                    print(f"Time: {current_time:.2f}, State: {self.current_state}, Recognized Gesture: {recognized_gesture}, Actionable: {gesture_data.get('performed_action', False)}")
-                    # Before returning, update prev_landmarks for subsequent frame
-                    self.prev_landmarks = hand_landmark_obj
-                    self.last_mouse_pos_normalized = (index_tip.x, index_tip.y)
-                    return recognized_gesture, gesture_data
-                # If conditions met for swipe but not a clear direction, let it pass to other logic
+        if is_basic_thumbs_up:
+            # 额外几何判断：大拇指指尖必须高于食指的指关节，才是真正的“赞”
+            # 在图像坐标系中，y值越小代表位置越高
+            if thumb_tip.y < index_mcp.y:
+                is_thumbs_up_posture = True
+                
+        # if hand_landmark_obj: print(f"is_fist: {utils.is_hand_closed_to_fist(actual_landmarks)}, is_open: {utils.is_hand_fully_open(actual_landmarks)}")
+        
+        # --- Primary State Machine Logic ---
+        if self.current_state == self.STATE_IDLE:
+            # if current_pinch_is_physically_closed: print("current_pinch_is_physically_closed")
+            # Priority: Check for stable, broad gestures first to avoid misinterpretation.
+            if is_thumbs_up_posture or is_middle_finger_scroll_posture:
+                if self.scroll_posture_start_time == 0.0:
+                    self.scroll_posture_start_time = current_time
+                elif (current_time - self.scroll_posture_start_time) > config.SCROLL_ENGAGE_HOLD_TIME:
+                    self._enter_state(self.STATE_SCROLL_MODE if is_middle_finger_scroll_posture else self.STATE_THUMBS_UP_SCROLL)
+                    self.prev_scroll_y = middle_tip.y if is_middle_finger_scroll_posture else wrist.y
+            elif is_fist and current_pinch_is_physically_open:
+                self._enter_state(self.STATE_FIST_STEADY)
+            elif is_open_hand and current_pinch_is_physically_open:
+                self._enter_state(self.STATE_OPEN_HAND_STEADY)
+            elif (current_time - self.last_reset_time) > config.GESTURE_DEBOUNCE_DELAY:
+                if current_pinch_is_physically_closed:
+                    self._enter_state(self.STATE_PINCH_DETECTED)
+                elif is_mouse_move_posture:
+                    self._enter_state(self.STATE_MOUSE_MOVING)
+                    self.is_new_movement_gesture = True
                 else:
-                    self.current_state = config.STATE_SWIPE_PENDING # Still pending if no clear direction yet
-                    self.swipe_start_time = current_time
-                    self.swipe_start_wrist_pos = wrist
-                    recognized_gesture = config.GESTURE_NONE
+                    self.scroll_posture_start_time = 0.0
+            # 握拳时大拇指放在拳头外侧，拇指高度应不高于近端食指关节！！！！
 
+        # --- Fist/Open Gesture Logic ---
+        elif self.current_state == self.STATE_FIST_STEADY:
+            # 当前是稳定的“握拳”状态，等待向“张手”转换
+            # 优先检查是否成功转换到了“张手”
+            if is_open_hand:
+                # 如果成功转换，再检查“握拳”姿态的持续时间是否足够长
+                time_held_open = current_time - self.state_start_time
 
-        # --- Mouse Moving Gesture State Management ---
-        # Prioritize mouse moving if the conditions are met OR if we are already in STATE_MOUSE_MOVING
-        if is_index_finger_extended and other_fingers_curled_for_mouse_move:
-            if self.current_state != config.STATE_MOUSE_MOVING:
-                if self.mouse_move_start_time == 0.0:
-                    self.mouse_move_start_time = current_time
-                if current_time - self.mouse_move_start_time > self.mouse_move_hold_threshold:
-                    self.current_state = config.STATE_MOUSE_MOVING
-            if self.current_state == config.STATE_MOUSE_MOVING:
-                target_x, target_y = utils.map_to_screen(index_tip.x, index_tip.y)
-                recognized_gesture = config.GESTURE_MOUSE_MOVING
-                gesture_data = {'x': target_x, 'y': target_y, 'performed_action': True}
-                self.last_mouse_pos_normalized = (index_tip.x, index_tip.y)
+                if time_held_open > config.GESTURE_TRANSITION_TIME:
+                    recognized_gesture, gesture_data['performed_action'] = config.GESTURE_FIST_TO_OPEN, True
+                else:
+                    print(f"DEBUG: 时间检查失败。保持时间需要超过 {config.GESTURE_TRANSITION_TIME} 秒。")
+                
+                # 无论持续时间是否足够，状态已经改变，必须重置
+                self._reset_all_states()
+
+            # 如果手没有变成“张手”，但也不再是“握拳”状态，说明手势乱了，安全重置
+            elif not is_fist:
+                self._reset_all_states()
+                
+        elif self.current_state == self.STATE_OPEN_HAND_STEADY:
+            # 当前是稳定的“张手”状态。计时器(self.state_start_time)已启动。
+            # 目标：检测是否转换到了“握拳”状态。
+            # --- 检查1: 手势是否成功变成了“握拳”？
+            if is_fist:
+                # print("DEBUG: 检测到'握拳'。准备检查计时器...")
+                
+                # 计算“张手”姿态已经保持了多久
+                time_held_open = current_time - self.state_start_time
+                # print(f"DEBUG: '张手'状态已保持 {time_held_open:.2f} 秒。")
+
+                # 只有当“张手”保持时间 > 设定的阈值时，才认为是有效手势
+                if time_held_open > config.GESTURE_TRANSITION_TIME:
+                    # print("DEBUG: 时间检查通过！识别为 GESTURE_OPEN_TO_FIST。")
+                    recognized_gesture, gesture_data['performed_action'] = config.GESTURE_OPEN_TO_FIST, True
+                else:
+                    print(f"DEBUG: 时间检查失败。保持时间需要超过 {config.GESTURE_TRANSITION_TIME} 秒。")
+
+                # 重要：因为手势已经从“张开”变为“握拳”，当前状态必须结束，所以重置。
+                self._reset_all_states()
+
+            # --- 检查2: 如果没变成“握拳”，那是否变成了“非张开”的混乱状态？
+            elif not is_open_hand:
+                # print("DEBUG: 手不再是'张开'，但也不是'握拳'。判定为混乱状态，重置。")
+                # 安全重置，防止因中间状态导致程序卡住
+                self._reset_all_states()
+
+            # --- 检查3: 如果以上都不是，说明手势仍保持在“张开”状态
+            else:
+                # Swipe detection logic (can only happen from a steady open hand)
+                if (current_time - self.state_start_time) > config.SWIPE_COOLDOWN:
+                    if self.prev_landmarks:
+                        dx, dy = utils.calculate_movement_2d_normalized(self.prev_landmarks.landmark[config.mp_hands.HandLandmark.WRIST], wrist)
+                        self.wrist_velocity_tracker.append((dx, dy))
+
+                        if len(self.wrist_velocity_tracker) == self.wrist_velocity_tracker.maxlen:
+                            avg_dx = sum(v[0] for v in self.wrist_velocity_tracker)
+                            avg_dy = sum(v[1] for v in self.wrist_velocity_tracker)
+
+                            if abs(avg_dx) > config.SWIPE_VELOCITY_THRESHOLD or abs(avg_dy) > config.SWIPE_VELOCITY_THRESHOLD:
+                                if abs(avg_dx) > abs(avg_dy): # 水平挥手
+                                    recognized_gesture = config.GESTURE_SWIPE_RIGHT if avg_dx > 0 else config.GESTURE_SWIPE_LEFT
+                                else: # 垂直挥手
+                                    recognized_gesture = config.GESTURE_SWIPE_DOWN if dy > 0 else config.GESTURE_SWIPE_UP
+                                self._reset_all_states()
+
+        elif self.current_state == self.STATE_MOUSE_MOVING:
+            if not is_mouse_move_posture:
+                self._reset_all_states()
+            else:
+                target_x, target_y = utils.map_to_screen(*self._apply_smoothing((index_tip.x, index_tip.y)))
+                recognized_gesture, gesture_data = config.GESTURE_MOUSE_MOVING, {'x': target_x, 'y': target_y, 'performed_action': True}
                 self.prev_landmarks = hand_landmark_obj
-                print(f"Time: {current_time:.2f}, State: {self.current_state}, Recognized Gesture: {recognized_gesture}, Actionable: {gesture_data.get('performed_action', False)}")
                 return recognized_gesture, gesture_data
-        else:
-            self.mouse_move_start_time = 0.0
-            if self.current_state == config.STATE_MOUSE_MOVING:
-                self.current_state = config.STATE_IDLE
 
-
-        # --- Other Gesture State Machine (Normal Priority, only if not mouse moving or swipe) ---
-        # This block will only be reached if STATE_MOUSE_MOVING is not active and not identified in this frame,
-        # and no FIST_TO_OPEN/OPEN_TO_FIST/Swipe was recognized.
-        if self.current_state == config.STATE_IDLE:
-            if current_pinch_is_physically_closed:
-                self.current_state = config.STATE_PINCH_DETECTED
-                self.pinch_start_time = current_time
+        elif self.current_state == self.STATE_PINCH_DETECTED:
+            # print(current_pinch_is_physically_open)
+            if (current_time - self.state_start_time) > config.DRAG_CONFIRM_DURATION:
+                self._enter_state(self.STATE_DRAGGING)
+                self.is_new_movement_gesture = True
+                recognized_gesture, gesture_data['performed_action'] = config.GESTURE_DRAG_START, True
+            elif current_pinch_is_physically_open:
+                self._enter_state(self.STATE_POSSIBLE_DOUBLE_CLICK)
                 self.last_click_time = current_time
-                pinch_mid_x_norm, pinch_mid_y_norm = utils.get_pinch_midpoint_normalized(thumb_tip, index_tip)
-                self.pinch_start_screen_pos = utils.map_to_screen(pinch_mid_x_norm, pinch_mid_y_norm)
-                recognized_gesture = config.GESTURE_NONE
-            elif is_middle_finger_extended and other_fingers_curled_for_scroll:
-                self.current_state = config.STATE_SCROLL_MODE
-                self.scroll_mode_engaged_time = current_time
-                self.prev_middle_finger_tip_y = middle_tip.y
-                recognized_gesture = config.GESTURE_SCROLL_MODE_ENGAGED
-            # Note: Swipe logic moved above. SWIPE_PENDING state is handled within the new swipe block if it's not immediately a full swipe.
-
-        elif self.current_state == config.STATE_PINCH_DETECTED:
-            if not current_pinch_is_physically_closed and current_pinch_is_physically_open:
-                if current_time - self.pinch_start_time < config.DRAG_CONFIRM_DURATION:
-                    if current_time - self.last_click_time < config.DOUBLE_CLICK_INTERVAL:
-                        recognized_gesture = config.GESTURE_DOUBLE_CLICK
-                        self.last_click_time = 0
-                    else:
-                        recognized_gesture = config.GESTURE_LEFT_CLICK
-                        self.last_click_time = current_time
-                    gesture_data['performed_action'] = True
-                self.current_state = config.STATE_IDLE
-            elif current_pinch_is_physically_closed:
-                pinch_duration = current_time - self.pinch_start_time
-                pinch_mid_x_norm, pinch_mid_y_norm = utils.get_pinch_midpoint_normalized(thumb_tip, index_tip)
-                current_pinch_screen_pos = utils.map_to_screen(pinch_mid_x_norm, pinch_mid_y_norm)
-                movement_since_pinch_start = utils.calculate_distance_2d(self.pinch_start_screen_pos, current_pinch_screen_pos)
-
-                if pinch_duration > config.DRAG_CONFIRM_DURATION and \
-                   movement_since_pinch_start > config.DRAG_CONFIRM_MOVEMENT_THRESHOLD:
-                    self.current_state = config.STATE_DRAGGING
-                    recognized_gesture = config.GESTURE_DRAG_START
-                    gesture_data = {'x': current_pinch_screen_pos[0], 'y': current_pinch_screen_pos[1], 'performed_action': True}
-
-        elif self.current_state == config.STATE_DRAGGING:
+        
+        elif self.current_state == self.STATE_POSSIBLE_DOUBLE_CLICK:
             if current_pinch_is_physically_closed:
-                pinch_current_mid_x_norm, pinch_current_mid_y_norm = utils.get_pinch_midpoint_normalized(thumb_tip, index_tip)
-                current_pinch_screen_pos = utils.map_to_screen(pinch_current_mid_x_norm, pinch_current_mid_y_norm)
-                recognized_gesture = config.GESTURE_DRAGGING
-                gesture_data = {'x': current_pinch_screen_pos[0], 'y': current_pinch_screen_pos[1], 'performed_action': True}
+                recognized_gesture, gesture_data['performed_action'] = config.GESTURE_DOUBLE_CLICK, True
+                self.last_click_time = 0
+                self._reset_all_states()
+            elif (current_time - self.last_click_time) > config.DOUBLE_CLICK_INTERVAL:
+                recognized_gesture, gesture_data['performed_action'] = config.GESTURE_LEFT_CLICK, True
+                self._reset_all_states()
+
+        elif self.current_state == self.STATE_DRAGGING:
+            if current_pinch_is_physically_open:
+                recognized_gesture, gesture_data['performed_action'] = config.GESTURE_DRAG_DROP, True
+                self._reset_all_states()
             else:
-                recognized_gesture = config.GESTURE_DRAG_DROP
-                gesture_data['performed_action'] = True
-                self._reset_all_states()
+                target_x, target_y = utils.map_to_screen(*self._apply_smoothing(utils.get_pinch_midpoint_normalized(thumb_tip, index_tip)))
+                recognized_gesture, gesture_data = config.GESTURE_DRAGGING, {'x': target_x, 'y': target_y, 'performed_action': True}
 
-        elif self.current_state == config.STATE_SCROLL_MODE:
-            if not (is_middle_finger_extended and other_fingers_curled_for_scroll):
-                self._reset_all_states()
-                recognized_gesture = config.GESTURE_NONE
-            elif self.prev_middle_finger_tip_y is not None:
-                curr_middle_finger_tip_y = middle_tip.y
-                dy_middle_finger = curr_middle_finger_tip_y - self.prev_middle_finger_tip_y
-
-                if abs(dy_middle_finger) > config.SCROLL_MOVEMENT_THRESHOLD_Y:
-                    scroll_amount = int(-1 * dy_middle_finger * config.SCROLL_SENSITIVITY_FACTOR)
-                    if scroll_amount > 0:
-                        recognized_gesture = config.GESTURE_SCROLL_UP
-                    else:
-                        recognized_gesture = config.GESTURE_SCROLL_DOWN
-                    gesture_data = {'amount': scroll_amount, 'performed_action': True}
-                else:
-                    recognized_gesture = config.GESTURE_SCROLL_MODE_ENGAGED
-                self.prev_middle_finger_tip_y = curr_middle_finger_tip_y
+        elif self.current_state == self.STATE_SCROLL_MODE:
+            if not is_middle_finger_scroll_posture: self._reset_all_states()
             else:
-                 recognized_gesture = config.GESTURE_SCROLL_MODE_ENGAGED
+                if self.prev_scroll_y is not None:
+                    dy = middle_tip.y - self.prev_scroll_y
+                    if abs(dy) > config.SCROLL_MOVEMENT_THRESHOLD_Y:
+                        scroll_amount = int(-1 * dy * config.SCROLL_SENSITIVITY_FACTOR)
+                        recognized_gesture, gesture_data = (config.GESTURE_SCROLL_UP if scroll_amount > 0 else config.GESTURE_SCROLL_DOWN), {'amount': scroll_amount, 'performed_action': True}
+                self.prev_scroll_y = middle_tip.y
+        
+        elif self.current_state == self.STATE_THUMBS_UP_SCROLL:
+            if not is_thumbs_up_posture: self._reset_all_states()
+            else:
+                if self.prev_scroll_y is not None:
+                    dy = wrist.y - self.prev_scroll_y
+                    if abs(dy) > config.SCROLL_MOVEMENT_THRESHOLD_Y:
+                        scroll_amount = int(-1 * dy * config.SCROLL_SENSITIVITY_FACTOR)
+                        recognized_gesture, gesture_data = (config.GESTURE_SCROLL_UP if scroll_amount > 0 else config.GESTURE_SCROLL_DOWN), {'amount': scroll_amount, 'performed_action': True}
+                self.prev_scroll_y = wrist.y
 
+        if recognized_gesture not in [config.GESTURE_NONE, config.GESTURE_MOUSE_MOVING]:
+            print(f"State: {self.current_state}, Recognized Gesture: {recognized_gesture}, Actionable: {gesture_data.get('performed_action', False)}")
 
-        elif self.current_state == config.STATE_SWIPE_PENDING:
-            # If in swipe pending, check for completion or timeout
-            if current_time - self.swipe_start_time > config.SWIPE_ACTION_DELAY or not is_hand_fully_open_posture:
-                self._reset_all_states()
-                recognized_gesture = config.GESTURE_NONE
-            elif self.swipe_start_wrist_pos:
-                dx, dy = utils.calculate_movement_2d_normalized(self.swipe_start_wrist_pos, wrist)
-                total_dist = utils.calculate_distance_2d((self.swipe_start_wrist_pos.x, self.swipe_start_wrist_pos.y), (wrist.x, wrist.y))
-
-                if total_dist > config.SWIPE_MIN_DISTANCE_NORM:
-                    if abs(dx) > abs(dy):
-                        if dx > 0: recognized_gesture = config.GESTURE_SWIPE_RIGHT
-                        else: recognized_gesture = config.GESTURE_SWIPE_LEFT
-                    else:
-                        if dy > 0: recognized_gesture = config.GESTURE_SWIPE_DOWN
-                        else: recognized_gesture = config.GESTURE_SWIPE_UP
-                    gesture_data['performed_action'] = True
-                    self.last_gesture_time = current_time
-                    self._reset_all_states()
-                else:
-                    recognized_gesture = config.GESTURE_NONE
-
-
-        # Always update prev_landmarks for the next frame's calculations if a hand is detected
-        # This line was originally after mouse moving logic, now it's important to be here or inside blocks that return.
-        # Ensure it's updated for all paths that might lead to a return.
-        self.prev_landmarks = hand_landmark_obj
-        self.last_mouse_pos_normalized = (index_tip.x, index_tip.y) # Always update, even if not mouse moving, for smoother re-entry
-
-
-        if recognized_gesture not in [config.GESTURE_NONE, config.GESTURE_SCROLL_MODE_ENGAGED] and \
-           'performed_action' not in gesture_data:
-            gesture_data['performed_action'] = True
-
-        print(f"Time: {current_time:.2f}, State: {self.current_state}, Recognized Gesture: {recognized_gesture}, Actionable: {gesture_data.get('performed_action', False)}")
+        self.prev_landmarks = hand_landmark_obj # Update previous landmarks at the end of every frame
         return recognized_gesture, gesture_data
