@@ -129,7 +129,7 @@ class GestureRecognizer:
         if self.current_state == self.STATE_IDLE:
             # if current_pinch_is_physically_closed: print("current_pinch_is_physically_closed")
             # Priority: Check for stable, broad gestures first to avoid misinterpretation.
-            if is_thumbs_up_posture:
+            if is_thumbs_up_posture or is_middle_finger_scroll_posture:
                 if self.scroll_posture_start_time == 0.0:
                     self.scroll_posture_start_time = current_time
                 elif (current_time - self.scroll_posture_start_time) > config.SCROLL_ENGAGE_HOLD_TIME:
