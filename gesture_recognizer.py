@@ -210,9 +210,9 @@ class GestureRecognizer:
 
                             if abs(avg_dx) > config.SWIPE_VELOCITY_THRESHOLD or abs(avg_dy) > config.SWIPE_VELOCITY_THRESHOLD:
                                 if abs(avg_dx) > abs(avg_dy): # 水平挥手
-                                    recognized_gesture = config.GESTURE_SWIPE_RIGHT if avg_dx > 0 else config.GESTURE_SWIPE_LEFT
+                                    recognized_gesture, gesture_data['performed_action'] = (config.GESTURE_SWIPE_RIGHT, True) if avg_dx > 0 else (config.GESTURE_SWIPE_LEFT, True)
                                 else: # 垂直挥手
-                                    recognized_gesture = config.GESTURE_SWIPE_DOWN if dy > 0 else config.GESTURE_SWIPE_UP
+                                    recognized_gesture, gesture_data['performed_action'] = (config.GESTURE_SWIPE_DOWN, True) if dy > 0 else (config.GESTURE_SWIPE_UP, True)
                                 self._reset_all_states()
 
         elif self.current_state == self.STATE_MOUSE_MOVING:
