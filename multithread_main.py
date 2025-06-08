@@ -14,7 +14,7 @@ import config
 from hand_tracker import HandTracker
 from gesture_recognizer import GestureRecognizer
 from action_controller import ActionController
-import app_detector  # For manually cycling profiles in this example
+import app_detector 
 
 frame_queue = queue.Queue(maxsize=2)  # 限制队列大小，防止处理过多旧帧
 result_queue = queue.Queue(maxsize=2)
@@ -131,7 +131,7 @@ def main_threaded():  # 重命名原来的 main
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA) 
 
             display_text = current_display_gesture 
-            if current_display_gesture == config.GESTURE_NONE and last_actionable_gesture != config.GESTURE_NONE:  #
+            if current_display_gesture == config.GESTURE_NONE and last_actionable_gesture != config.GESTURE_NONE: 
                 display_text = f"Last Action: {last_actionable_gesture}" 
             elif current_display_gesture == config.GESTURE_SCROLL_MODE_ENGAGED: 
                 display_text = config.GESTURE_SCROLL_MODE_ENGAGED 
@@ -145,9 +145,9 @@ def main_threaded():  # 重命名原来的 main
             fps_text_main = f"Display FPS: {fps_main:.1f}"
             # print(fps_text_main)
             cv2.putText(display_frame, fps_text_main, (10, 110),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)  #
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)  
 
-            cv2.imshow('Gesture Control HCI', display_frame)  #
+            cv2.imshow('Gesture Control HCI', display_frame)  
             result_queue.task_done()
 
             if sys.platform == "win32":
@@ -162,10 +162,10 @@ def main_threaded():  # 重命名原来的 main
             if key == ord('q'):
                 stop_event.set()
                 break
-            elif key == ord('p'):  #
-                app_detector.cycle_app_profile()  #
-                action_controller.update_profile()  #
-                last_actionable_gesture = config.GESTURE_NONE  #
+            elif key == ord('p'):  
+                app_detector.cycle_app_profile()  
+                action_controller.update_profile()  
+                last_actionable_gesture = config.GESTURE_NONE  
 
 
     finally:
@@ -174,9 +174,9 @@ def main_threaded():  # 重命名原来的 main
         if cam_thread.is_alive(): cam_thread.join(timeout=1)
         if proc_thread.is_alive(): proc_thread.join(timeout=1)
 
-        if 'cap' in locals() and cap.isOpened(): cap.release()  #
-        cv2.destroyAllWindows()  #
-        if 'hand_tracker.py' in locals(): hand_tracker.close()  #
+        if 'cap' in locals() and cap.isOpened(): cap.release()  
+        cv2.destroyAllWindows()  
+        if 'hand_tracker.py' in locals(): hand_tracker.close()  
         print("Gesture Control HCI Stopped.")
 
 

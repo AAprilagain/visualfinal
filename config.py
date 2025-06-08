@@ -31,11 +31,11 @@ SCROLL_SENSITIVITY_FACTOR = 2000        # Multiplier for scroll amount
 SCROLL_ENGAGE_HOLD_TIME = 0.8           # 触发scroll的最小维持时间
 
 # Swipe Gesture Parameters
-SWIPE_THRESHOLD_SPEED = 0.1             # Normalized units/second for swipe
+# SWIPE_THRESHOLD_SPEED = 0.1           # Normalized units/second for swipe
+# SWIPE_MIN_DISTANCE_NORM = 0.01        # Minimum normalized distance for a swipe to be considered valid
+# SWIPE_MIN_DISTANCE = 0.1              # 归一化距离，挥手需要的最小距离 (0.15约为屏幕宽度的15%)
+# SWIPE_MAX_DURATION = 0.4              # 秒，完成挥手所需的最大时间
 SWIPE_ACTION_DELAY = 1                  # Seconds to wait after a swipe action
-SWIPE_MIN_DISTANCE_NORM = 0.01          # Minimum normalized distance for a swipe to be considered valid
-SWIPE_MIN_DISTANCE = 0.1                # 归一化距离，挥手需要的最小距离 (0.15约为屏幕宽度的15%)
-SWIPE_MAX_DURATION = 0.4                # 秒，完成挥手所需的最大时间
 SWIPE_VELOCITY_THRESHOLD = 0.025
 SWIPE_COOLDOWN = 0.2                    # 张手握拳0.2秒后才判断挥手
 
@@ -43,7 +43,7 @@ SWIPE_COOLDOWN = 0.2                    # 张手握拳0.2秒后才判断挥手
 FIST_CLOSED_THRESHOLD = 0.15            # Adjusted: Increased to be more tolerant for 'closed' state
 HAND_OPEN_THRESHOLD = 0.2               # Adjusted: Increased to be more tolerant for 'open' state
 FINGER_CURL_TOLERANCE = 0.03            # New: Add a small tolerance for finger curl check
-GESTURE_TRANSITION_TIME = 0.1           # Time in seconds for a hand state transition to be considered a gesture
+GESTURE_TRANSITION_TIME = 0.05          # Time in seconds for a hand state transition to be considered a gesture
 
 # Mouse Movement Mapping
 MOUSE_MAP_X_MIN = 0.25                   # Normalized hand x-coordinate to map to screen left

@@ -59,32 +59,6 @@ def is_thumb_extended(landmarks):
         return False
 
 
-def is_hand_closed_to_fist(landmarks):
-    """
-    Checks if the hand is in a fist-like (closed) position by checking if finger tips
-    are close to the middle finger's MCP joint (a proxy for palm center).
-    """
-    # Define finger tip landmarks
-    finger_tips = [
-        landmarks[mp.solutions.hands.HandLandmark.THUMB_TIP],
-        landmarks[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP],
-        landmarks[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP],
-        landmarks[mp.solutions.hands.HandLandmark.RING_FINGER_TIP],
-        landmarks[mp.solutions.hands.HandLandmark.PINKY_TIP]
-    ]
-
-    # Define the "palm center" as the middle finger's MCP joint
-    palm_center_lm = landmarks[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP]
-
-    # Check if all finger tips are "close" to the palm center
-    for tip in finger_tips:
-        dist_to_palm_center = calculate_distance_3d(tip, palm_center_lm)
-        # Use FIST_CLOSED_THRESHOLD from config
-        if dist_to_palm_center > config.FIST_CLOSED_THRESHOLD:
-            return False
-
-    return True
-
 def map_to_screen(x_normalized, y_normalized):
     """Maps normalized hand coordinates to actual screen coordinates."""
     screen_x = np.interp(x_normalized,
@@ -137,38 +111,63 @@ def is_hand_fully_open(landmarks):
     # 只要四根主手指满足伸展条件，我们就认为手已完全张开
     return True
 
-
 def is_hand_closed_to_fist(landmarks):
     """
-    通过检查四根主手指（食指到小指）是否都处于卷曲状态来判断是否为握拳。
-    这个版本更宽容，因为它忽略了位置多变的大拇指。
-    卷曲的定义是：指尖到手腕的距离 < 指关节(PIP)到手腕的距离。
+    Checks if the hand is in a fist-like (closed) position by checking if finger tips
+    are close to the middle finger's MCP joint (a proxy for palm center).
     """
-    try:
-        wrist_lm = landmarks[mp.solutions.hands.HandLandmark.WRIST]
-        
-        # 遍历四根主手指
-        for tip_idx, pip_idx in [
-            (mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP, mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP),
-            (mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP, mp.solutions.hands.HandLandmark.MIDDLE_FINGER_PIP),
-            (mp.solutions.hands.HandLandmark.RING_FINGER_TIP, mp.solutions.hands.HandLandmark.RING_FINGER_PIP),
-            (mp.solutions.hands.HandLandmark.PINKY_TIP, mp.solutions.hands.HandLandmark.PINKY_PIP)
-        ]:
-            tip_lm = landmarks[tip_idx]
-            pip_lm = landmarks[pip_idx]
-            
-            dist_wrist_to_tip = calculate_distance_3d(wrist_lm, tip_lm)
-            dist_wrist_to_pip = calculate_distance_3d(wrist_lm, pip_lm)
-            
-            # 核心判断：如果任何一根手指的指尖比其指关节更远离手腕，则说明该手指是伸展的
-            if dist_wrist_to_tip > dist_wrist_to_pip:
-                # 如果需要调试，可以取消下面这行代码的注释，它会告诉你哪根手指没握紧
-                # print(f"DEBUG: Fist check failed on finger {tip_idx.name}")
-                return False
+    # Define finger tip landmarks
+    finger_tips = [
+        landmarks[mp.solutions.hands.HandLandmark.THUMB_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.RING_FINGER_TIP],
+        landmarks[mp.solutions.hands.HandLandmark.PINKY_TIP]
+    ]
 
-    except Exception as e:
-        # print(f"Error in is_hand_closed_to_fist: {e}")
-        return False
+    # Define the "palm center" as the middle finger's MCP joint
+    palm_center_lm = landmarks[mp.solutions.hands.HandLandmark.MIDDLE_FINGER_MCP]
 
-    # 如果循环顺利完成，说明四根主手指均已卷曲，我们判定为握拳成功！
+    # Check if all finger tips are "close" to the palm center
+    for tip in finger_tips:
+        dist_to_palm_center = calculate_distance_3d(tip, palm_center_lm)
+        # Use FIST_CLOSED_THRESHOLD from config
+        if dist_to_palm_center > config.FIST_CLOSED_THRESHOLD:
+            return False
+
     return True
+
+# def is_hand_closed_to_fist(landmarks):
+#     """
+#     通过检查四根主手指（食指到小指）是否都处于卷曲状态来判断是否为握拳。
+#     这个版本更宽容，因为它忽略了位置多变的大拇指。
+#     卷曲的定义是：指尖到手腕的距离 < 指关节(PIP)到手腕的距离。
+#     """
+#     try:
+#         wrist_lm = landmarks[mp.solutions.hands.HandLandmark.WRIST]
+#         
+#         # 遍历四根主手指
+#         for tip_idx, pip_idx in [
+#             (mp.solutions.hands.HandLandmark.INDEX_FINGER_TIP, mp.solutions.hands.HandLandmark.INDEX_FINGER_PIP),
+#             (mp.solutions.hands.HandLandmark.MIDDLE_FINGER_TIP, mp.solutions.hands.HandLandmark.MIDDLE_FINGER_PIP),
+#             (mp.solutions.hands.HandLandmark.RING_FINGER_TIP, mp.solutions.hands.HandLandmark.RING_FINGER_PIP),
+#             (mp.solutions.hands.HandLandmark.PINKY_TIP, mp.solutions.hands.HandLandmark.PINKY_PIP)
+#         ]:
+#             tip_lm = landmarks[tip_idx]
+#             pip_lm = landmarks[pip_idx]
+#             
+#             dist_wrist_to_tip = calculate_distance_3d(wrist_lm, tip_lm)
+#             dist_wrist_to_pip = calculate_distance_3d(wrist_lm, pip_lm)
+#             
+#             # 核心判断：如果任何一根手指的指尖比其指关节更远离手腕，则说明该手指是伸展的
+#             if dist_wrist_to_tip > dist_wrist_to_pip:
+#                 # 如果需要调试，可以取消下面这行代码的注释，它会告诉你哪根手指没握紧
+#                 # print(f"DEBUG: Fist check failed on finger {tip_idx.name}")
+#                 return False
+# 
+#     except Exception as e:
+#         # print(f"Error in is_hand_closed_to_fist: {e}")
+#         return False
+# 
+#     # 如果循环顺利完成，说明四根主手指均已卷曲，我们判定为握拳成功！
+#     return True
