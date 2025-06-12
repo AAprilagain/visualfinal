@@ -43,7 +43,7 @@ SWIPE_COOLDOWN = 0.2                    # 张手握拳0.2秒后才判断挥手
 FIST_CLOSED_THRESHOLD = 0.15            # Adjusted: Increased to be more tolerant for 'closed' state
 HAND_OPEN_THRESHOLD = 0.2               # Adjusted: Increased to be more tolerant for 'open' state
 FINGER_CURL_TOLERANCE = 0.03            # New: Add a small tolerance for finger curl check
-GESTURE_TRANSITION_TIME = 0.05          # Time in seconds for a hand state transition to be considered a gesture
+GESTURE_TRANSITION_TIME = 0.1          # Time in seconds for a hand state transition to be considered a gesture
 
 # Mouse Movement Mapping
 MOUSE_MAP_X_MIN = 0.25                   # Normalized hand x-coordinate to map to screen left
@@ -163,7 +163,24 @@ CUSTOM_APP_GESTURE_MAPPINGS = {
         GESTURE_SWIPE_DOWN: "hotkey_down",
         GESTURE_FIST_TO_OPEN: "press_f",
         GESTURE_OPEN_TO_FIST: "press_esc",
+    },
+    "WPS": {
+        GESTURE_MOUSE_MOVING: "mouse_move",
+        GESTURE_LEFT_CLICK: "left_click",
+        GESTURE_DOUBLE_CLICK: "hotkey_up",
+        GESTURE_DRAG_START: "do_nothing",
+        GESTURE_DRAGGING: "do_nothing",
+        GESTURE_DRAG_DROP: "do_nothing",
+        GESTURE_SCROLL_UP: "do_nothing",
+        GESTURE_SCROLL_DOWN: "do_nothing",
+        GESTURE_SWIPE_LEFT: "hotkey_down",
+        GESTURE_SWIPE_RIGHT: "hotkey_down",
+        GESTURE_SWIPE_UP: "hotkey_down",
+        GESTURE_SWIPE_DOWN: "hotkey_down",
+        GESTURE_FIST_TO_OPEN: "press_f5",
+        GESTURE_OPEN_TO_FIST: "press_esc",
     }
+
 }
 
 # Add a list of all available action keys for the dropdowns in the UI
@@ -184,6 +201,7 @@ AVAILABLE_ACTIONS = [
     "hotkey_alt_right",
     "hotkey_ctrl_z",
     "hotkey_ctrl_shift_z",
+    "press_f5",
     "press_a",
     "press_b",
     "press_c",

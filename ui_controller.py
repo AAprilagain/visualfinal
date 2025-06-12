@@ -14,7 +14,7 @@ CONFIG_FILE = "gesture_mappings.json"
 class UIController:
     def __init__(self, master, start_callback, stop_callback, update_mappings_callback):
         self.master = master
-        self.master.title("Gesture Control Settings")
+        self.master.title("HandBridge")
         self.master.geometry("800x600")
 
         self.start_callback = start_callback

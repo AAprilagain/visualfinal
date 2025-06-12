@@ -163,7 +163,7 @@ def main_threaded_wrapper():
             cv2.putText(display_frame, fps_text_main, (10, 110),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
 
-            cv2.imshow('Gesture Control HCI', display_frame)
+            cv2.imshow('HandBridge', display_frame)
             result_queue.task_done()
 
             if sys.platform == "win32":

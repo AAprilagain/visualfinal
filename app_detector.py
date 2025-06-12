@@ -10,7 +10,8 @@ SUPPORTED_PROFILES = {
     "default": "Default Profile",
     "browser": "Web Browser Profile",
     "douyin": "Douyin Profile",
-    "bilibili": "bilibili Profile"  # Added Douyin profile
+    "bilibili": "bilibili Profile",
+    "WPS": "WPS Profile"
 }
 _profile_keys = list(SUPPORTED_PROFILES.keys())
 _current_profile_index = 0 # Ensure this starts at 'default' if 'default' is the first key
@@ -40,6 +41,8 @@ def get_active_application_profile():
                     return "browser"
                 elif "哔哩哔哩" in window_title:
                     return "bilibili"
+                elif "ppt" in window_title:
+                    return "WPS"
                 # Add other application detection logic here
         except Exception as e:
             # print(f"Error detecting active window: {e}") # Might be too noisy
