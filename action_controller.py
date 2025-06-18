@@ -24,7 +24,7 @@ BASE_ACTIONS = {
     "hotkey_ctrl_z": lambda **kwargs: pyautogui.hotkey('ctrl', 'z'),
     "hotkey_ctrl_shift_z": lambda **kwargs: pyautogui.hotkey('ctrl', 'shift', 'z'),
     # New keyboard actions
-    "press_f5": lambda **kwargs: pyautogui.press('f5'),
+    "press_f5": lambda **kwargs: pyautogui.hotkey('shift', 'f5'),
     "press_a": lambda **kwargs: pyautogui.press('a'),
     "press_b": lambda **kwargs: pyautogui.press('b'),
     "press_c": lambda **kwargs: pyautogui.press('c'),

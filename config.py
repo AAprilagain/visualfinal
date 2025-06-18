@@ -43,7 +43,7 @@ SWIPE_COOLDOWN = 0.2                    # 张手握拳0.2秒后才判断挥手
 FIST_CLOSED_THRESHOLD = 0.15            # Adjusted: Increased to be more tolerant for 'closed' state
 HAND_OPEN_THRESHOLD = 0.2               # Adjusted: Increased to be more tolerant for 'open' state
 FINGER_CURL_TOLERANCE = 0.03            # New: Add a small tolerance for finger curl check
-GESTURE_TRANSITION_TIME = 0.1          # Time in seconds for a hand state transition to be considered a gesture
+GESTURE_TRANSITION_TIME = 0.05          # Time in seconds for a hand state transition to be considered a gesture
 
 # Mouse Movement Mapping
 MOUSE_MAP_X_MIN = 0.25                   # Normalized hand x-coordinate to map to screen left
